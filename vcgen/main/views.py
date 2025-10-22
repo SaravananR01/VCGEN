@@ -10,3 +10,9 @@ def login(request):
 
 def signup(request):
     return render(request,"main/signup.html")
+
+def joinclass(request):
+    return render(request,"main/joinclass.html")
+
+def thankyou(request):
+    return render(request,"main/thankyou.html")
