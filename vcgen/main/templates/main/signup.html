@@ -4,5 +4,37 @@
 Sign-up
 {% endblock %}
 {% block body %}
-    
+<div class="flex flex-col items-center justify-center min-h-screen bg-[#daf0ee]">
+    <div class="w-full sm:w-96 bg-white p-8 rounded-lg shadow-lg border-2 border-[#94d1be]">
+        <!-- <div class="absolute top-4 right-4">
+            <a href="{% url 'signup' %}" class="text-[#3b413c] font-semibold hover:text-[#9db5b2]">Sign Up</a>
+        </div> -->
+        
+        <h2 class="text-center text-2xl font-semibold text-[#3b413c] mb-6">Sign-up</h2>
+        
+        <form action="{% url 'signup' %}" method="post">
+            {% csrf_token %}
+            <div class="mb-4">
+                <label for="username" class="block text-[#3b413c] font-medium">Username (ID)</label>
+                <input type="text" id="username" name="username" class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" placeholder="Enter your username" required>
+            </div>
+            <div class="mb-6">
+                <label for="email" class="block text-[#3b413c] font-medium">E-Mail</label>
+                <input type="email" id="email" name="email" class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" placeholder="Enter your email" required>
+            </div>
+            <div class="mb-6">
+                <label for="password" class="block text-[#3b413c] font-medium">Password</label>
+                <input type="password" id="password" name="password" class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" placeholder="Enter your password" required>
+            </div>
+            
+            <div>
+                <button type="submit" class="w-full bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Create Account</button>
+            </div>
+        </form>
+        
+        <div class="text-center mt-4">
+            <p class="text-[#9db5b2] text-sm">Already have an account? <a href="{% url 'login' %}" class="text-[#3b413c] font-semibold hover:text-[#9db5b2]">Login</a></p>
+        </div>
+    </div>
+</div>
 {% endblock %}
