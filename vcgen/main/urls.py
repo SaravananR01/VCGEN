@@ -7,4 +7,6 @@ urlpatterns=[
     path("signup/",views.signup,name="signup"),
     path("joinclass/",views.joinclass,name="joinclass"),
     path("thankyou/",views.thankyou,name="thankyou"),
+    path("survey/",views.survey,name="survey"),
+    path("results/",views.results,name="results"),
 ]

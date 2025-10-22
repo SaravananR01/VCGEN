@@ -16,3 +16,9 @@ def joinclass(request):
 
 def thankyou(request):
     return render(request,"main/thankyou.html")
+
+def survey(request):
+    return render(request,"main/survey.html")
+
+def results(request):
+    return render(request,"main/results.html")
