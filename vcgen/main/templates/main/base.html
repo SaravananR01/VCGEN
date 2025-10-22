@@ -1,0 +1,28 @@
+<html>
+    <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+        <style>
+            .cusfont {
+                font-family: "Playfair Display", serif;
+                font-optical-sizing: auto;
+                font-style: normal;
+            }
+        </style>
+        {% block title %}
+
+        {% endblock %}
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    </head>
+    <body class="flex flex-row cusfont">
+        <div class="flex rounded flex-row h-1/20 m-1 w-full bg-green-500">
+            <div class="m-1 bold">
+                VCGEN
+            </div>
+        </div>
+        {% block body %}
+        
+        {% endblock %}
+    </body>    
+</html>
