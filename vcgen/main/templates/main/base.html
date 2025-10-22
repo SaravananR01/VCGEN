@@ -3,26 +3,26 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+        
+        <title>{% block title %}{% endblock %}</title>
+        
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
         <style>
-            .cusfont {
+            .cusfont{
                 font-family: "Playfair Display", serif;
                 font-optical-sizing: auto;
-                font-style: normal;
             }
         </style>
-        {% block title %}
-
-        {% endblock %}
-        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     </head>
-    <body class="flex flex-row cusfont">
-        <div class="flex rounded flex-row h-1/20 m-1 w-full bg-green-500">
-            <div class="m-1 bold">
-                VCGEN
-            </div>
-        </div>
+    <body class="bg-[#daf0ee] text-[#3b413c] cusfont flex flex-col">
+        <header class="bg-[#94d1be] text-white text-xl font-bold py-4 text-center">
+            VCGEN
+        </header>
         {% block body %}
-        
         {% endblock %}
+
+        <footer class="bg-[#3b413c] text-white py-4 text-center mt-auto">
+            <p>&copy; 2025 VCGEN. All Rights Reserved.</p>
+        </footer>
     </body>    
 </html>
