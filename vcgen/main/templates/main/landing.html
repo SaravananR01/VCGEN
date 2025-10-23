@@ -6,7 +6,7 @@ VCGEN
 
 {% block body %}
 <div class="flex h-screen bg-[#daf0ee]">
-    <div class="flex-1 bg-[#94d1be] text-white flex items-center justify-center cursor-pointer hover:bg-[#9db5b2] transition duration-300" onclick="window.location.href='{% url 'login' %}';">
+    <div class="flex-1 bg-[#94d1be] text-white flex items-center justify-center cursor-pointer hover:bg-[#9db5b2] transition duration-300" onclick="location.href = '/login';">
         <div class="text-center">
             {%load static%}
             <img src="{% static 'main/teacher-svg.svg' %}" alt="Faculty Icon" class="w-12 h-12 mb-4 mx-auto">
@@ -15,7 +15,7 @@ VCGEN
         </div>
     </div>
 
-    <div class="flex-1 bg-[#ffffff] text-[#3b413c] flex items-center justify-center cursor-pointer hover:bg-[#f1f5f3] transition duration-300" onclick="window.location.href='{% url 'joinclass' %}';">
+    <div class="flex-1 bg-[#ffffff] text-[#3b413c] flex items-center justify-center cursor-pointer hover:bg-[#f1f5f3] transition duration-300" onclick="location.href = '/joinclass';">
         <div class="text-center">
             {%load static%}
             <img src="{% static 'main/student-svg.svg' %}" alt="Student Icon" class="w-12 h-12 mb-4 mx-auto">

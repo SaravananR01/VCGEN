@@ -11,7 +11,7 @@ urlpatterns=[
     path("results/<str:class_id>",views.results,name="results"),
     path("classes/",views.classes,name="classes"),
     path("newclass/",views.newclass,name="newclass"),
-    path("settings/",views.settings,name="settings"),
+    path("settings/<str:class_id>",views.settings,name="settings"),
     path("responses/",views.responses,name="responses"),
     path("delete-response",views.delete_response,name="delete_response"),
 ]

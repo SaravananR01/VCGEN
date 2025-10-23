@@ -9,64 +9,81 @@ Settings
 
     <div class="flex justify-between items-center mb-8">
         <h1 class="text-3xl font-bold text-[#3b413c]">Allocate Hours</h1>
-
+        <form action="#" method="post">
         <div class="flex items-center gap-4">
             <label for="scaleSlider" class="text-[#3b413c] font-medium">Adjust Percentage of Hrs:</label>
             <input 
-                id="scaleSlider"
+                id="ss_hoursplit"
+                name="ss_hoursplit"
                 type="range" 
                 min="25" 
                 max="75" 
                 step="1"
                 value="50"
                 class="w-40 accent-[#94d1be] cursor-pointer"
-                oninput="scaleValue.value = this.value"
+                oninput="sv_hoursplit.value = this.value"
             />
             <input 
                 type="number" 
-                id="scaleValue"
+                id="sv_hoursplit"
+                name="sv_hoursplit"
                 min="25" 
                 max="75"
                 value="50"
                 class="w-20 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
-                oninput="scaleSlider.value = this.value"
+                oninput="ss_hoursplit.value = this.value"
             />
         </div>
     </div>
-
-    <form action="#" method="post" class="flex flex-col gap-6 max-w-5xl mx-auto">
+    <h1 class="text-3xl text-center font-bold text-[#3b413c] p-4">{{cname}}</h1>
+    
+        <div class="flex flex-col gap-6 max-w-5xl mx-auto">
         {% csrf_token %}
         {% for module in modules %}
         <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6">
 
             <div class="grid grid-cols-3 gap-4">
-                <div class="flex items-center justify-center border-r border-[#9db5b2]">
-                    <h2 class="text-xl font-semibold text-[#3b413c] text-center">
-                        Module {{ forloop.counter }}
-                    </h2>
+                <div class="flex flex-col items-center justify-center border-r border-[#9db5b2]">
+                    <div>
+                        <h2 class="text-xl font-semibold text-[#3b413c] text-center">
+                        Module {{ forloop.counter }} - {{module.mod.name}}
+                        </h2>
+                    </div>
+                    <br>
+                    <div class="text-xl">
+                        Hours : {{ module.mod.hours }}
+                    </div>
+                    
                 </div>
-
-                <div class="flex flex-col gap-3 border-r border-[#9db5b2] pl-4">
-                    {% for topic in module.topics %}
-                    <div class="text-[#3b413c]">{{ topic }}</div>
+                <div class="flex flex-col col-span-2">
+                    <div class="flex flex-row justify-between gap-3 p-1 text-xl">
+                        <div class="w-1/2 text-[#3b413c] text-center">Topics</div>
+                        <div class="w-44 text-center">Difficulty 1-5</div>
+                    </div>
+                    <br>
+                    {% for topic in module.topicslist %}
+                    <div class="flex flex-row justify-between gap-3 p-1">
+                        <div class="text-[#3b413c]">{{ topic.content }}</div>
+                        <div><input 
+                            type="number"
+                            id="weight_{{topic.topic_id}}"
+                            name="weight_{{topic.topic_id}}"
+                            placeholder="Difficulty 1-5"
+                            min="1"
+                            max="5"
+                            class="w-40 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
+                            required
+                        /></div>
+                        
+                    </div>
                     {% endfor %}
                 </div>
-
-                <div class="flex flex-col gap-3 pl-4">
-                    {% for topic in module.topics %}
-                    <input 
-                        type="number"
-                        name="hours_module{{ forloop.parentloop.counter }}_topic{{ forloop.counter }}"
-                        placeholder="hrs"
-                        min="1"
-                        class="w-20 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
-                    />
-                    {% endfor %}
-                </div>
+                
+                
             </div>
         </div>
         {% endfor %}
-        <!-- <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6 max-w-4xl mx-auto">
+        <!--<div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6 max-w-4xl mx-auto">
 
         <div class="grid grid-cols-3 gap-4">
             <div class="flex items-center justify-center border-r border-[#9db5b2]">
@@ -122,6 +139,7 @@ Settings
             >
                 Save Allocations
             </button>
+        </div>
         </div>
     </form>
 </div>

@@ -8,11 +8,11 @@ Results
     <div class="w-11/12 bg-white m-2 p-8 rounded-lg shadow-lg border-2 border-[#94d1be] flex flex-col">
         <div class="flex w-full flex-row justify-between py-4 h-1/6">
             <div class="w-1/2 flex">
-                <button onclick="window.location.href='{% url 'classes' %}';" class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
+                <button onclick="location.href = '/classes';" class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
             </div>
             
             <div class="w-1/2 flex justify-end">
-                <button onclick="window.location.href='{% url 'settings' %}';" class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">Edit</button>
+                <button onclick="location.href = '/settings/{{cid}}';" class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">Edit</button>
                 <button class="w-1/6 bg-[#94d1be] text-white p-1 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">View Responses</button>
                 <button onclick="" class="w-1/6 bg-[#94d1be] text-white p-1 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">Download Plan</button>
             </div><!--onclick="window.location.href='{ url 'responses' %}';"-->
@@ -21,21 +21,17 @@ Results
         
         <h2 class="text-left text-2xl font-semibold text-[#3b413c] mb-6">{{cname}}</h2>
         <h3 class="text-left text-3xl font-semibold text-[#3b413c] mb-6">Results-</h2>
+
         {% for mod in modules %}
-        <div class="w-full p-8 rounded-lg shadow-lg border-2 border-[#94d1be] bg-[#9db5b2] text-xl m-2">
-            <h1 class="text-2xl text-left">{{forloop.counter}}. {{mod.name}}</h1>
-            <ul class="list-disc list-inside "></ul>
-            {% for cmod,topicdata in topics.items %}
-            <!--{{mod.module_id}}|||{{cmod}}||| {{topicdata}}<br>-->
-            {% if cmod == mod.module_id %}
-                {% for topic in topicdata %}
-                <li>{{topic}} </li>
-                {% endfor %}
-            {% endif %}
-            {% endfor %}
-            </ul>
-            Total = {{mod.hours}}
-        </div>
+            <div class="w-full p-8 rounded-lg shadow-lg border-2 border-[#94d1be] bg-[#9db5b2] text-xl m-2">
+                <h1 class="text-2xl text-left">{{forloop.counter}}. {{mod.mod.name}}</h1>
+                <ul class="list-disc list-inside ">
+                    {% for topic in mod.topicslist %}
+                        <li>{{topic.topic.content}} - {{topic.teachertime}} + {{topic.studenttime}} = {{topic.time}}</li>
+                    {% endfor %}
+                </ul>
+                Total = {{mod.modtime}}
+            </div>
         {% endfor %}
 
     </div>

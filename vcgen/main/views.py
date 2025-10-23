@@ -101,11 +101,47 @@ def results(request,class_id):
         ourclass=ourclass[0]
         data={}
         modules=Module.objects.filter(course=ourclass)
+
+        class cusModule:
+            def __init__(self,mod):
+                self.mod=mod
+                self.topicslist=[]
+                self.modtime=0
+
+            def addtopic(self,topic):
+                self.topicslist.append(topic)
+                self.modtime+=topic.time
+
+        class cusTopic:
+
+            def __init__(self,topic,teachertime,studenttime):
+                self.topic=topic
+                self.teachertime=teachertime
+                self.studenttime=studenttime
+                self.time=teachertime+studenttime
+
+
+
+        ourmods=[]
         for mod in modules:
-            data[mod.module_id]=[f"{x.content} - {x.teacherweight*mod.hours} + {x.studentweight*mod.hours} = {x.studentweight+x.teacherweight*mod.hours} hours" for x in Topics.objects.filter(module=mod)]
+            newmod=cusModule(mod)
+
+            #data[mod.module_id]=[]
+            for topic in Topics.objects.filter(module=mod):
+                teachertime=topic.teacherweight*mod.hours*ourclass.split
+                studenttime=topic.studentweight*ourclass.hours*(100-ourclass.split)
+                newtopic=cusTopic(topic,teachertime,studenttime)
+                newmod.addtopic(newtopic)
+
+                
+                #data[mod.module_id].append(f"{topic.content} - {teachertime} + {studenttime} = {teachertime+studenttime} hours")
+            ourmods.append(newmod)
+
+
+        context['cid']=class_id
         context['cname']=ourclass.name
-        context['modules']= modules
-        context['topics']=data
+        context['modules']= ourmods#modules
+        #context['topics']=data
     return render(request,"main/results.html",context=context)
 
 def classes(request):
@@ -157,8 +193,49 @@ def newclass(request):
         return redirect('classes')
     return render(request,"main/newclass.html")
 
-def settings(request):
-    return render(request,"main/settings.html")
+def settings(request,class_id):
+    context={}
+    if 'user' not in request.session:
+        return redirect('login')
+    ourclass=Course.objects.filter(course_id=class_id)
+    if len(ourclass)<1:
+        return redirect('classes')
+    else:
+        class cusModule:
+            def __init__(self,mod):
+                self.mod=mod
+                self.topicslist=[]
+                
+            
+            def addtopic(self,topic):
+                self.topicslist.append(topic)
+
+        ourclass=ourclass[0]
+        datamodules=[]
+        modules=Module.objects.filter(course=ourclass)
+        for mod in modules:
+            curmod=cusModule(mod)
+            for topic in Topics.objects.filter(module=mod):
+                curmod.addtopic(topic)
+            datamodules.append(curmod)
+
+            
+        context['cname']=ourclass.name
+        context['modules']= datamodules
+        if request.method=="POST":
+            coursesplit=int(request.POST[f'sv_hoursplit'])
+            ourclass.split=coursesplit/100
+            ourclass.save()
+            for mod in datamodules:
+                weightsum=0
+                for topic in mod.topicslist:
+                    weightsum+=int(request.POST[f'weight_{topic.topic_id}'])
+                for topic in mod.topicslist:
+                    topic.teacherweight=int(request.POST[f'weight_{topic.topic_id}'])/weightsum
+                    topic.save()
+            return redirect(f'/results/{class_id}')
+            
+    return render(request,"main/settings.html",context=context)
 
 def responses(request):
     return render(request,"main/responses.html")

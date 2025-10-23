@@ -16,7 +16,7 @@
     </head>
     <body class="bg-[#daf0ee] text-[#3b413c] cusfont flex flex-col">
         <header class="bg-[#94d1be] text-white text-xl font-bold py-4 text-center w-full">
-            <h1 onclick="window.location.href='{% url 'landing' %}';" class="hover:cursor-pointer text-3xl w-fit mx-2">VCGEN</h1>
+            <h1 onclick="location.href = '/landing';" class="hover:cursor-pointer text-3xl w-fit mx-2">VCGEN</h1>
         </header>
         {% block body %}
         {% endblock %}
