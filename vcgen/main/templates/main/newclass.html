@@ -3,6 +3,60 @@
 {% block title %}
 Add New Class!
 {% endblock %}
+
 {% block body %}
-    
+<div class="min-h-screen bg-[#daf0ee] font-sans flex flex-col items-center py-10">
+
+    <h1 class="text-3xl font-bold text-[#3b413c] mb-8">Modules</h1>
+
+
+    <form action="#" method="post" class="w-full max-w-3xl flex flex-col gap-6">
+        {% csrf_token %}
+        {% for i in "1234567" %}
+        <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6">
+
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                <h2 class="text-xl font-semibold text-[#3b413c] mb-2 sm:mb-0">Module - {{ forloop.counter }}</h2>
+                <div class="flex flex-col sm:flex-row gap-3 sm:items-center w-full sm:w-auto">
+                    <input 
+                        type="text" 
+                        name="module_name{{ forloop.counter }}" 
+                        placeholder="Module name"
+                        class="flex-1 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]"
+                        required
+                    />
+                    <input 
+                        type="number" 
+                        name="module_hrs{{ forloop.counter }}" 
+                        placeholder="Hours"
+                        min="1"
+                        class="w-24 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]"
+                        required
+                    />
+                </div>
+            </div>
+
+            <label for="topic{{ forloop.counter }}" class="block text-[#3b413c] font-medium mb-1">Topic</label>
+            <input 
+                type="text" 
+                id="topic{{ forloop.counter }}" 
+                name="topic{{ forloop.counter }}" 
+                placeholder="Enter topics for Module {{ forloop.counter }}" 
+                class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]"
+                required
+            />
+        </div>
+        {% endfor %}
+
+        <div class="flex justify-end mt-6">
+            <button 
+                type="submit" 
+                class="bg-[#94d1be] text-white px-6 py-3 rounded-md hover:bg-[#9db5b2] transition duration-300 shadow-md hover:cursor-pointer"
+            >
+                Confirm
+            </button>
+        </div>
+    </form>
+
+</div>
 {% endblock %}
