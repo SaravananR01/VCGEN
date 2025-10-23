@@ -3,6 +3,141 @@
 {% block title %}
 Settings
 {% endblock %}
+
 {% block body %}
-    
+<div class="min-h-screen bg-[#daf0ee] font-sans p-8">
+
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-[#3b413c]">Allocate Hours</h1>
+
+        <div class="flex items-center gap-4">
+            <label for="scaleSlider" class="text-[#3b413c] font-medium">Adjust Percentage of Hrs:</label>
+            <input 
+                id="scaleSlider"
+                type="range" 
+                min="25" 
+                max="75" 
+                step="1"
+                value="50"
+                class="w-40 accent-[#94d1be] cursor-pointer"
+                oninput="scaleValue.value = this.value"
+            />
+            <input 
+                type="number" 
+                id="scaleValue"
+                min="25" 
+                max="75"
+                value="50"
+                class="w-20 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
+                oninput="scaleSlider.value = this.value"
+            />
+        </div>
+    </div>
+
+    <form action="#" method="post" class="flex flex-col gap-6 max-w-5xl mx-auto">
+        {% csrf_token %}
+        {% for module in modules %}
+        <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6">
+
+            <div class="grid grid-cols-3 gap-4">
+                <div class="flex items-center justify-center border-r border-[#9db5b2]">
+                    <h2 class="text-xl font-semibold text-[#3b413c] text-center">
+                        Module {{ forloop.counter }}
+                    </h2>
+                </div>
+
+                <div class="flex flex-col gap-3 border-r border-[#9db5b2] pl-4">
+                    {% for topic in module.topics %}
+                    <div class="text-[#3b413c]">{{ topic }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="flex flex-col gap-3 pl-4">
+                    {% for topic in module.topics %}
+                    <input 
+                        type="number"
+                        name="hours_module{{ forloop.parentloop.counter }}_topic{{ forloop.counter }}"
+                        placeholder="hrs"
+                        min="1"
+                        class="w-20 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
+                    />
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        <!-- <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6 max-w-4xl mx-auto">
+
+        <div class="grid grid-cols-3 gap-4">
+            <div class="flex items-center justify-center border-r border-[#9db5b2]">
+                <h2 class="text-xl font-semibold text-[#3b413c] text-center">
+                    Module 1
+                </h2>
+            </div>
+
+            <div class="flex flex-col gap-3 border-r border-[#9db5b2] pl-4">
+                <div class="text-[#3b413c]">Introduction to Data Structures</div>
+                <div class="text-[#3b413c]">Arrays and Linked Lists</div>
+                <div class="text-[#3b413c]">Stacks and Queues</div>
+                <div class="text-[#3b413c]">Trees and Graphs</div>
+            </div>
+
+            <div class="flex flex-col gap-3 pl-4">
+                <input 
+                    type="number"
+                    name="hours_module1_topic1"
+                    placeholder="hrs"
+                    min="1"
+                    class="w-20 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
+                />
+                <input 
+                    type="number"
+                    name="hours_module1_topic2"
+                    placeholder="hrs"
+                    min="1"
+                    class="w-20 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
+                />
+                <input 
+                    type="number"
+                    name="hours_module1_topic3"
+                    placeholder="hrs"
+                    min="1"
+                    class="w-20 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
+                />
+                <input 
+                    type="number"
+                    name="hours_module1_topic4"
+                    placeholder="hrs"
+                    min="1"
+                    class="w-20 p-2 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be] text-center"
+                />
+            </div>
+        </div> -->
+    </div>
+
+        <div class="flex justify-end mt-6">
+            <button 
+                type="submit"
+                class="bg-[#94d1be] text-white px-6 py-3 rounded-md hover:bg-[#9db5b2] transition duration-300 shadow-md mb-3"
+            >
+                Save Allocations
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    const scaleSlider = document.getElementById("scaleSlider");
+    const scaleValue = document.getElementById("scaleValue");
+
+    scaleSlider.addEventListener("input", () => {
+        scaleValue.value = scaleSlider.value;
+    });
+    scaleValue.addEventListener("input", () => {
+        let val = parseInt(scaleValue.value);
+        if (val >= 25 && val <= 75) {
+            scaleSlider.value = val;
+        }
+    });
+</script>
 {% endblock %}

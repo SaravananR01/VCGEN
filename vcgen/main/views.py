@@ -22,3 +22,12 @@ def survey(request):
 
 def results(request):
     return render(request,"main/results.html")
+
+def classes(request):
+    return render(request,"main/classes.html")
+
+def newclass(request):
+    return render(request,"main/newclass.html")
+
+def settings(request):
+    return render(request,"main/settings.html")
