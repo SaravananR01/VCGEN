@@ -2,9 +2,28 @@ from django.shortcuts import render,redirect
 
 from .models import Teacher,Course,Module,Topics,Student
 import random
+import re
 
-def gen_t_id():
+def gen_teacher_id():
     code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
+    while len(Teacher.objects.filter(teacher_id=code))>0:
+        code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
+    return code
+
+def gen_course_id():
+    code="C"+"".join([str(random.randint(1,9)) for x in range(7)])
+    while len(Teacher.objects.filter(teacher_id=code))>0:
+        code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
+    return code
+
+def gen_module_id():
+    code="M"+"".join([str(random.randint(1,9)) for x in range(7)])
+    while len(Teacher.objects.filter(teacher_id=code))>0:
+        code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
+    return code
+
+def gen_topic_id():
+    code="O"+"".join([str(random.randint(1,9)) for x in range(7)])
     while len(Teacher.objects.filter(teacher_id=code))>0:
         code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
     return code
@@ -51,7 +70,7 @@ def signup(request):
                 context['error']="You are not eligible for an account."
             else:
                 newteacher=Teacher.objects.create(
-                    teacher_id=gen_t_id(),
+                    teacher_id=gen_teacher_id(),
                     name=name,
                     email=email
                 )
@@ -75,9 +94,52 @@ def results(request):
     return render(request,"main/results.html")
 
 def classes(request):
+    context={}
+    if 'user' not in request.session:
+        return redirect('login')
+    #do display stuff where you pass in the classes linked to the teacher
     return render(request,"main/classes.html")
 
 def newclass(request):
+    context={}
+    if 'user' not in request.session:
+        return redirect('login')
+    if request.method=='POST':
+        faculty=Teacher.objects.filter(teacher_id=request.session['user'])[0]
+        newcourse=Course.objects.create(
+            course_id=gen_course_id(),
+            teacher=faculty,
+            name=request.POST['cname'],
+            hours=request.POST['chours'],
+            split=0,
+        )
+        for i in range(1,8):
+            modname=request.POST[f'module_name{i}']
+            modhours=request.POST[f'module_hrs{i}']
+            modtopics=request.POST[f'topic{i}']
+
+            newmod=Module.objects.create(
+                model_id=gen_module_id(),
+                course=newcourse,
+                hours=modhours,
+                name=modname
+            )
+
+
+            text=modtopics.replace("\n","")
+            text=text.replace(", and",", ")
+            pattern=r' - | – |,'
+            topicslist =re.split(pattern, text)
+            for topic in topicslist:
+                newtopic=Topics.objects.create(
+                    topic_id=gen_topic_id(),
+                    module=newmod,
+                    content=topic,
+                    mapped_skill="",
+                    teacherweight=0,
+                    studentweight=0,
+                )
+        return redirect('classes')
     return render(request,"main/newclass.html")
 
 def settings(request):
