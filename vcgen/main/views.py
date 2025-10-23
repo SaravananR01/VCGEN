@@ -144,3 +144,10 @@ def newclass(request):
 
 def settings(request):
     return render(request,"main/settings.html")
+
+def responses(request):
+    return render(request,"main/responses.html")
+
+def delete_response(request):
+    #add functionality - delete response
+    print("response deleted")
