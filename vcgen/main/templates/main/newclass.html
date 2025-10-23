@@ -11,6 +11,16 @@ Add New Class!
 
 
     <form action="#" method="post" class="w-full max-w-3xl flex flex-col gap-6">
+        <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6">
+
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                <h2 class="text-xl font-semibold text-[#3b413c] mb-2 sm:mb-0">Course Details-</h2>
+            </div>
+            <label for="cname" class="block text-[#3b413c] font-medium">Course Name</label>
+            <input type="text" id="cname" name="cname" placeholder="Enter the course name" class="w-full m-1 p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" required/>
+            <label for="chours" class="block text-[#3b413c] font-medium">Course Total Hours</label>
+            <input type="chours" id="chours" name="chours" placeholder="Enter total course hours" class="w-full m-1 p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" required/>
+        </div>
         {% csrf_token %}
         {% for i in "1234567" %}
         <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6">
