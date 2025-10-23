@@ -22,7 +22,7 @@ class Course(models.Model):
     split=models.DecimalField(decimal_places=3,max_digits=10)
 
 class Module(models.Model):
-    model_id=models.CharField(max_length=8,primary_key=True)
+    module_id=models.CharField(max_length=8,primary_key=True)
     course=models.ForeignKey(Course,on_delete=models.CASCADE)
     hours=models.IntegerField()
     name=models.CharField(max_length=100)

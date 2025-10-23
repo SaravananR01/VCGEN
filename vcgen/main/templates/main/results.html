@@ -19,35 +19,25 @@ Results
             
         </div>
         
-        <h2 class="text-left text-2xl font-semibold text-[#3b413c] mb-6">[Subject Name]</h2>
+        <h2 class="text-left text-2xl font-semibold text-[#3b413c] mb-6">{{cname}}</h2>
         <h3 class="text-left text-3xl font-semibold text-[#3b413c] mb-6">Results-</h2>
+        {% for mod in modules %}
         <div class="w-full p-8 rounded-lg shadow-lg border-2 border-[#94d1be] bg-[#9db5b2] text-xl m-2">
-            <h1 class="text-2xl text-left">1. [Module Name]</h1>
-            <ul class="list-disc list-inside ">
-                <li>Topic 1 - 1 + 1 = 2 hours</li>
-                <li>Topic 2 - 1 + 1 = 2 hours</li>
-                <li>Topic 3 - 1 + 1 = 2 hours</li>
+            <h1 class="text-2xl text-left">{{forloop.counter}}. {{mod.name}}</h1>
+            <ul class="list-disc list-inside "></ul>
+            {% for cmod,topicdata in topics.items %}
+            <!--{{mod.module_id}}|||{{cmod}}||| {{topicdata}}<br>-->
+            {% if cmod == mod.module_id %}
+                {% for topic in topicdata %}
+                <li>{{topic}} </li>
+                {% endfor %}
+            {% endif %}
+            {% endfor %}
             </ul>
-            Total = 6 hours
+            Total = {{mod.hours}}
         </div>
-        <div class="w-full p-8 rounded-lg shadow-lg border-2 border-[#94d1be] bg-[#9db5b2] text-xl m-2">
-            <h1 class="text-2xl text-left">2. [Module Name]</h1>
-            <ul class="list-disc list-inside ">
-                <li>Topic 1 - 1 + 1 = 2 hours</li>
-                <li>Topic 2 - 1 + 1 = 2 hours</li>
-                <li>Topic 3 - 1 + 1 = 2 hours</li>
-            </ul>
-            Total = 6 hours
-        </div>
-        <div class="w-full p-8 rounded-lg shadow-lg border-2 border-[#94d1be] bg-[#9db5b2] text-xl m-2">
-            <h1 class="text-2xl text-left">3. [Module Name]</h1>
-            <ul class="list-disc list-inside ">
-                <li>Topic 1 - 1 + 1 = 2 hours</li>
-                <li>Topic 2 - 1 + 1 = 2 hours</li>
-                <li>Topic 3 - 1 + 1 = 2 hours</li>
-            </ul>
-            Total = 6 hours
-        </div>
+        {% endfor %}
+
     </div>
 </div>
 {% endblock %}

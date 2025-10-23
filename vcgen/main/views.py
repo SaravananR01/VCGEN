@@ -90,8 +90,23 @@ def thankyou(request):
 def survey(request):
     return render(request,"main/survey.html")
 
-def results(request):
-    return render(request,"main/results.html")
+def results(request,class_id):
+    context={}
+    if 'user' not in request.session:
+        return redirect('login')
+    ourclass=Course.objects.filter(course_id=class_id)
+    if len(ourclass)<1:
+        return redirect('classes')
+    else:
+        ourclass=ourclass[0]
+        data={}
+        modules=Module.objects.filter(course=ourclass)
+        for mod in modules:
+            data[mod.module_id]=[f"{x.content} - {x.teacherweight*mod.hours} + {x.studentweight*mod.hours} = {x.studentweight+x.teacherweight*mod.hours} hours" for x in Topics.objects.filter(module=mod)]
+        context['cname']=ourclass.name
+        context['modules']= modules
+        context['topics']=data
+    return render(request,"main/results.html",context=context)
 
 def classes(request):
     context={}
@@ -119,14 +134,14 @@ def newclass(request):
             modtopics=request.POST[f'topic{i}']
 
             newmod=Module.objects.create(
-                model_id=gen_module_id(),
+                module_id=gen_module_id(),
                 course=newcourse,
                 hours=modhours,
                 name=modname
             )
 
 
-            text=modtopics.replace("\n","")
+            text=modtopics.replace("\n"," ")
             text=text.replace(", and",", ")
             pattern=r' - | – |,'
             topicslist =re.split(pattern, text)
