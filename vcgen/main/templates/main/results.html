@@ -8,14 +8,14 @@ Results
     <div class="w-11/12 bg-white m-2 p-8 rounded-lg shadow-lg border-2 border-[#94d1be] flex flex-col">
         <div class="flex w-full flex-row justify-between py-4 h-1/6">
             <div class="w-1/2 flex">
-                <button class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
+                <button onclick="window.location.href='{% url 'classes' %}';" class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
             </div>
             
             <div class="w-1/2 flex justify-end">
-                <button class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">Edit</button>
+                <button onclick="window.location.href='{% url 'settings' %}';" class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">Edit</button>
                 <button class="w-1/6 bg-[#94d1be] text-white p-1 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">View Responses</button>
-                <button class="w-1/6 bg-[#94d1be] text-white p-1 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">Download Plan</button>
-            </div>
+                <button onclick="" class="w-1/6 bg-[#94d1be] text-white p-1 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">Download Plan</button>
+            </div><!--onclick="window.location.href='{ url 'responses' %}';"-->
             
         </div>
         
