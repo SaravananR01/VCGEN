@@ -97,8 +97,8 @@ def classes(request):
     context={}
     if 'user' not in request.session:
         return redirect('login')
-    #do display stuff where you pass in the classes linked to the teacher
-    return render(request,"main/classes.html")
+    context['classes']=Course.objects.filter(teacher=Teacher.objects.filter(teacher_id=request.session['user'])[0])
+    return render(request,"main/classes.html",context=context)
 
 def newclass(request):
     context={}
