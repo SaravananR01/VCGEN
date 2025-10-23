@@ -15,8 +15,8 @@ Sign-up
         <form action="{% url 'signup' %}" method="post">
             {% csrf_token %}
             <div class="mb-4">
-                <label for="username" class="block text-[#3b413c] font-medium">Username (ID)</label>
-                <input type="text" id="username" name="username" class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" placeholder="Enter your username" required>
+                <label for="name" class="block text-[#3b413c] font-medium">Name</label>
+                <input type="text" id="name" name="name" class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" placeholder="Enter your name" required>
             </div>
             <div class="mb-6">
                 <label for="email" class="block text-[#3b413c] font-medium">E-Mail</label>
@@ -33,8 +33,9 @@ Sign-up
             <div>
                 <button type="submit" class="w-full bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Create Account</button>
             </div>
+            
         </form>
-        
+        <div class="text-red-500 text-center">{{error}}</div>
         <div class="text-center mt-4">
             <p class="text-[#9db5b2] text-sm">Already have an account? <a href="{% url 'login' %}" class="text-[#3b413c] font-semibold hover:text-[#9db5b2]">Login</a></p>
         </div>

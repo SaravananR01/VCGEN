@@ -1,10 +1,18 @@
 from django.db import models
+from django.contrib.auth.hashers import make_password,check_password
 
+#Teacher,Course,Module,Topics,Student
 class Teacher(models.Model):
     teacher_id=models.CharField(max_length=8,primary_key=True)
     name=models.CharField(max_length=20)
     email=models.EmailField(null=False)
-    password=models.EmailField(null=False)
+    password=models.CharField(null=False,max_length=128)
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
 
 class Course(models.Model):
     course_id=models.CharField(max_length=8,primary_key=True)
