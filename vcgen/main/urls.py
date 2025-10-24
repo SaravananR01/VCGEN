@@ -13,6 +13,6 @@ urlpatterns=[
     path("newclass/",views.newclass,name="newclass"),
     path("deleteclass/<str:class_id>",views.delete_class,name="delete_class"),
     path("settings/<str:class_id>",views.settings,name="settings"),
-    path("responses/",views.responses,name="responses"),
-    path("delete-response/",views.delete_response,name="delete_response")
+    path("responses/<str:class_id>",views.responses,name="responses"),
+    path("deleteresponse/<str:class_id>/<str:student_id>",views.delete_response,name="delete_response")
 ]
