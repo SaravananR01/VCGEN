@@ -9,7 +9,7 @@ Join A Class!
         
         <h2 class="text-center text-2xl font-semibold text-[#3b413c] mb-6">Join a Class</h2>
         
-        <form action="{% url 'login' %}" method="post">
+        <form action="#" method="post">
             {% csrf_token %}
             <div class="mb-4">
                 <label for="code" class="block text-[#3b413c] font-medium">Code</label>
@@ -28,7 +28,7 @@ Join A Class!
                 <button type="submit" class="w-full bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Join Class</button>
             </div>
         </form>
-        
+        <div class="text-red-500 text-center">{{error}}</div>
     </div>
 </div>
 {% endblock %}

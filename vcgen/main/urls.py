@@ -7,11 +7,12 @@ urlpatterns=[
     path("signup/",views.signup,name="signup"),
     path("joinclass/",views.joinclass,name="joinclass"),
     path("thankyou/",views.thankyou,name="thankyou"),
-    path("survey/",views.survey,name="survey"),
+    path("survey/<str:class_id>",views.survey,name="survey"),
     path("results/<str:class_id>",views.results,name="results"),
     path("classes/",views.classes,name="classes"),
     path("newclass/",views.newclass,name="newclass"),
+    path("deleteclass/<str:class_id>",views.delete_class,name="delete_class"),
     path("settings/<str:class_id>",views.settings,name="settings"),
     path("responses/",views.responses,name="responses"),
-    path("delete-response",views.delete_response,name="delete_response"),
+    path("delete-response/",views.delete_response,name="delete_response")
 ]

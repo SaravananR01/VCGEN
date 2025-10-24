@@ -15,8 +15,17 @@
         </style>
     </head>
     <body class="bg-[#daf0ee] text-[#3b413c] cusfont flex flex-col">
-        <header class="bg-[#94d1be] text-white text-xl font-bold py-4 text-center w-full">
-            <h1 onclick="location.href = '/landing';" class="hover:cursor-pointer text-3xl w-fit mx-2">VCGEN</h1>
+        <header class="bg-[#94d1be] text-white text-xl font-bold py-4 text-center w-full flex flex-row justify-between">
+            <h1 onclick="location.href = '/';" class="hover:cursor-pointer text-3xl w-fit mx-2 px-1">VCGEN</h1>
+            {% if name %}
+            <div class="flex flex-row items-center">
+                <h1 class="m-2">{{name}}  </h1>
+                <button onclick="location.href = '/';" class="p-1 m-1 bg-[#94d1be] text-white rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Click To Log Out  </button>
+            </div>
+            
+            {% else %}
+            <h1 onclick="location.href = '/';" class="px-1"></h1>
+            {% endif %}
         </header>
         {% block body %}
         {% endblock %}

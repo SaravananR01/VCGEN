@@ -12,23 +12,32 @@ def gen_teacher_id():
 
 def gen_course_id():
     code="C"+"".join([str(random.randint(1,9)) for x in range(7)])
-    while len(Teacher.objects.filter(teacher_id=code))>0:
-        code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
+    while len(Course.objects.filter(course_id=code))>0:
+        code="C"+"".join([str(random.randint(1,9)) for x in range(7)])
     return code
 
 def gen_module_id():
     code="M"+"".join([str(random.randint(1,9)) for x in range(7)])
-    while len(Teacher.objects.filter(teacher_id=code))>0:
-        code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
+    while len(Module.objects.filter(module_id=code))>0:
+        code="M"+"".join([str(random.randint(1,9)) for x in range(7)])
     return code
 
 def gen_topic_id():
     code="O"+"".join([str(random.randint(1,9)) for x in range(7)])
-    while len(Teacher.objects.filter(teacher_id=code))>0:
-        code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
+    while len(Topics.objects.filter(topic_id=code))>0:
+        code="O"+"".join([str(random.randint(1,9)) for x in range(7)])
     return code
 
+def gen_student_id():
+    code="S"+"".join([str(random.randint(1,9)) for x in range(7)])
+    while len(Student.objects.filter(student_id=code))>0:
+        code="S"+"".join([str(random.randint(1,9)) for x in range(7)])
+    return code
+
+
 def landing(request):
+    request.session.clear()
+    request.session.flush()
     return render(request,"main/landing.html")
 
 def login(request):
@@ -46,7 +55,7 @@ def login(request):
             else:
                 request.session['user']=user.teacher_id
                 request.session.modified=True
-                request.session.set_expiry(600)
+                request.session.set_expiry(6000)
                 return redirect('classes')   
 
     return render(request,'main/login.html',context=context)
@@ -82,18 +91,63 @@ def signup(request):
     return render(request,"main/signup.html",context=context)
 
 def joinclass(request):
-    return render(request,"main/joinclass.html")
+    context={}
+    if request.method=="POST":
+        code=request.POST['code']
+        name=request.POST['name']
+        regno=request.POST['regno']
+        reqclass=Course.objects.filter(course_id=code)
+        if len(reqclass)<1:
+            context['error']="Invalid code!"
+        elif re.match(r'[0-9]{2}[a-zA-Z]{3}[0-9]{4,}',regno)==None:
+            context['error']="Invalid Registration Number"
+        else:
+            student=Student.objects.create(
+                student_id=gen_student_id(),
+                name=name,
+                course=reqclass[0],
+                skillsreq=""
+            )
+            request.session['student']=student.student_id
+            request.session.modified=True
+            request.session.set_expiry(6000)
+            return redirect(f'/survey/{code}')
+    return render(request,"main/joinclass.html",context=context)
 
 def thankyou(request):
     return render(request,"main/thankyou.html")
 
-def survey(request):
-    return render(request,"main/survey.html")
+def survey(request,class_id):
+    context={}
+    ourclass=Course.objects.filter(course_id=class_id)
+    if 'student' not in request.session:
+        return redirect('login')
+    else:
+        context['name']=Student.objects.filter(student_id=request.session['student'])[0].name
+    if len(ourclass)<1:
+        return redirect("/")
+    else:
+        ourclass=ourclass[0]
+        if request.method=="POST":
+            ...
+        else:
+            context['cid']=class_id
+            context['cname']=ourclass.name
+            mods=Module.objects.filter(course=ourclass)
+            skills=[]
+            for mod in mods:
+                skills.extend([x.mapped_skill for x in Topics.objects.filter(module=mod) if x.mapped_skill ])
+            skills=list(set(skills))
+            context['skills']=skills
+            print(skills)
+    return render(request,"main/survey.html",context=context)
 
 def results(request,class_id):
     context={}
     if 'user' not in request.session:
         return redirect('login')
+    else:
+        context['name']=Teacher.objects.filter(teacher_id=request.session['user'])[0].name
     ourclass=Course.objects.filter(course_id=class_id)
     if len(ourclass)<1:
         return redirect('classes')
@@ -148,6 +202,8 @@ def classes(request):
     context={}
     if 'user' not in request.session:
         return redirect('login')
+    else:
+        context['name']=Teacher.objects.filter(teacher_id=request.session['user'])[0].name
     context['classes']=Course.objects.filter(teacher=Teacher.objects.filter(teacher_id=request.session['user'])[0])
     return render(request,"main/classes.html",context=context)
 
@@ -155,6 +211,8 @@ def newclass(request):
     context={}
     if 'user' not in request.session:
         return redirect('login')
+    else:
+        context['name']=Teacher.objects.filter(teacher_id=request.session['user'])[0].name
     if request.method=='POST':
         faculty=Teacher.objects.filter(teacher_id=request.session['user'])[0]
         newcourse=Course.objects.create(
@@ -175,12 +233,29 @@ def newclass(request):
                 hours=modhours,
                 name=modname
             )
-
-
+            text=modtopics.replace("\n"," ")
+            text=text.replace(", and",", ")
+            text=text.replace(" - ","$$$")
+            text=text.replace(" – ","$$$")
+            brackettrue=False
+            op=""
+            for x in text:
+                if x=="," and not brackettrue:
+                    op+="$$$"
+                else:
+                    op+=x
+                
+                if x=="(":
+                    brackettrue=True
+                elif x==")":
+                    brackettrue=False
+            text=op
+            topicslist=text.split("$$$")
+            '''
             text=modtopics.replace("\n"," ")
             text=text.replace(", and",", ")
             pattern=r' - | – |,'
-            topicslist =re.split(pattern, text)
+            topicslist =re.split(pattern, text)'''
             for topic in topicslist:
                 newtopic=Topics.objects.create(
                     topic_id=gen_topic_id(),
@@ -197,6 +272,8 @@ def settings(request,class_id):
     context={}
     if 'user' not in request.session:
         return redirect('login')
+    else:
+        context['name']=Teacher.objects.filter(teacher_id=request.session['user'])[0].name
     ourclass=Course.objects.filter(course_id=class_id)
     if len(ourclass)<1:
         return redirect('classes')
@@ -219,7 +296,7 @@ def settings(request,class_id):
                 curmod.addtopic(topic)
             datamodules.append(curmod)
 
-            
+        context['cid']=class_id
         context['cname']=ourclass.name
         context['modules']= datamodules
         if request.method=="POST":
@@ -243,3 +320,14 @@ def responses(request):
 def delete_response(request):
     #add functionality - delete response
     print("response deleted")
+
+def delete_class(request,class_id):
+    context={}
+    if 'user' not in request.session:
+        return redirect('login')
+    else:
+        todelete=Course.objects.filter(course_id=class_id)
+        if todelete:
+            todelete=todelete[0]
+            todelete.delete()
+    return redirect('/classes')

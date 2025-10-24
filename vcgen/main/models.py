@@ -37,5 +37,6 @@ class Topics(models.Model):
 
 class Student(models.Model):
     student_id=models.CharField(max_length=8,primary_key=True)
+    name=models.CharField(max_length=20)
     course=models.ForeignKey(Course,on_delete=models.CASCADE)
     skillsreq=models.CharField(max_length=1000)
