@@ -458,6 +458,15 @@ def newclass(request):
                     brackettrue=False
             text=op
             topicslist=text.split("$$$")
+            op=[]
+            for topic in topicslist:
+                topic=topic.strip(" ")
+                if topic[0].isupper()  or not op:
+                    op.append(topic)
+                else:
+                    temp=op.pop()
+                    op.append(temp+", "+topic)
+            topicslist=op
             '''
             text=modtopics.replace("\n"," ")
             text=text.replace(", and",", ")
