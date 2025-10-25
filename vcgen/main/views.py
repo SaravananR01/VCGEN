@@ -426,14 +426,15 @@ def newclass(request):
             course_id=gen_course_id(),
             teacher=faculty,
             name=request.POST['cname'],
-            hours=request.POST['chours'],
+            hours=0,
             split=0,
         )
+        hours=0
         for i in range(1,8):
             modname=request.POST[f'module_name{i}']
             modhours=request.POST[f'module_hrs{i}']
             modtopics=request.POST[f'topic{i}']
-
+            hours+=int(modhours)
             newmod=Module.objects.create(
                 module_id=gen_module_id(),
                 course=newcourse,
@@ -483,7 +484,10 @@ def newclass(request):
                     teacherweight=0,
                     studentweight=0,
                 )
-        return redirect(f'settings/{newcourse.course_id}')
+        newcourse.hours=hours
+        newcourse.save()
+        
+        return redirect(f'/settings/{newcourse.course_id}')
     return render(request,"main/newclass.html")
 
 def settings(request,class_id):
