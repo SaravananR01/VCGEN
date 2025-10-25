@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer,util
 from transformers import pipeline
+#import torch
 
 SKILLS = {
     "Problem Solving": "finding problems, thinking of solutions, and building programs that work step by step",
@@ -45,10 +46,11 @@ SKILLS = {
 LABELS = list(SKILLS.keys())
 LABEL_TEXTS = [f"{k}: {v}" for k, v in SKILLS.items()]
 
+#device = 0 if torch.cuda.is_available() else -1
 
-
-zshot = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+zshot = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")#, device=device)
 encodings = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+#encodings = encodings.to(device)
 skills_embs = encodings.encode(LABELS,normalize_embeddings=True)
 
 def zero_shot_label(text,labels=LABELS):
@@ -300,8 +302,8 @@ def results(request,class_id):
 
             #data[mod.module_id]=[]
             for topic in Topics.objects.filter(module=mod):
-                teachertime=topic.teacherweight*mod.hours*ourclass.split
-                studenttime=topic.studentweight*ourclass.hours*(100-(ourclass.split*100))/100
+                teachertime=round(topic.teacherweight*mod.hours*ourclass.split,2)
+                studenttime=round(topic.studentweight*ourclass.hours*(100-(ourclass.split*100))/100,2)
                 newtopic=cusTopic(topic,teachertime,studenttime)
                 newmod.addtopic(newtopic)
 
@@ -315,6 +317,93 @@ def results(request,class_id):
         context['modules']= ourmods#modules
         #context['topics']=data
     return render(request,"main/results.html",context=context)
+
+def dayplan(request,class_id):
+    context={}
+    if 'user' not in request.session:
+        return redirect('login')
+    else:
+        context['name']=Teacher.objects.filter(teacher_id=request.session['user'])[0].name
+    ourclass=Course.objects.filter(course_id=class_id)
+    if len(ourclass)<1:
+        return redirect('classes')
+    else:
+        ourclass=ourclass[0]
+        data={}
+        modules=Module.objects.filter(course=ourclass)
+
+        class cusModule:
+            def __init__(self,mod):
+                self.mod=mod
+                self.topicslist=[]
+                self.modtime=0
+
+            def addtopic(self,topic):
+                self.topicslist.append(topic)
+                self.modtime+=topic.time
+
+        class cusTopic:
+
+            def __init__(self,topic,teachertime,studenttime):
+                self.topic=topic
+                self.teachertime=teachertime
+                self.studenttime=studenttime
+                self.time=teachertime+studenttime
+                #self.cuslabel=ensemble_label(self.topic.content)['pred']
+
+        ourmods=[]
+        for mod in modules:
+            newmod=cusModule(mod)
+            for topic in Topics.objects.filter(module=mod):
+                teachertime=round(topic.teacherweight*mod.hours*ourclass.split,2)
+                studenttime=round(topic.studentweight*ourclass.hours*(100-(ourclass.split*100))/100,2)
+                newtopic=cusTopic(topic,teachertime,studenttime)
+                newmod.addtopic(newtopic)
+            ourmods.append(newmod)
+
+        class slot:
+
+            def __init__(self,content,mod):
+                self.content=content
+                self.mod=mod
+        slots=[]
+        cur=0
+        tempcontent=""
+        tempmod=""
+        lastcontent=""
+        lastmod=""
+        for mod in ourmods:
+            for topic in mod.topicslist:
+                tempcontent+=topic.topic.content+", "
+                lastcontent=topic.topic.content
+                if mod.mod.name not in tempmod:
+                    tempmod+=mod.mod.name+", "
+                    lastmod=mod.mod.name
+                cur+=topic.time
+                #print(tempcontent,tempmod)
+                while cur>1:
+                    tempcontent=tempcontent.rstrip(", ")
+                    tempmod=tempmod.rstrip(", ")
+                    newslot=slot(tempcontent,tempmod)
+                    #print(tempcontent,tempmod)
+                    slots.append(newslot)
+                    if cur==1:
+                        cur=0
+                        tempcontent=""
+                        tempmod=""
+                    elif cur>1:
+                        cur-=1
+                        tempcontent=lastcontent+", "
+                        tempmod=lastmod+", "
+        tempcontent=tempcontent.rstrip(", ")
+        tempmod=tempmod.rstrip(", ")
+        newslot=slot(tempcontent,tempmod)
+        #print(tempcontent,tempmod)
+        slots.append(newslot)
+        context['cid']=class_id
+        context['cname']=ourclass.name
+        context['slots']=slots
+    return render(request,"main/dayplan.html",context=context)
 
 def classes(request):
     context={}
@@ -385,7 +474,7 @@ def newclass(request):
                     teacherweight=0,
                     studentweight=0,
                 )
-        return redirect('classes')
+        return redirect(f'settings/{newcourse.course_id}')
     return render(request,"main/newclass.html")
 
 def settings(request,class_id):
