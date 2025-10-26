@@ -3,7 +3,8 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
-        
+        {%load static%}
+        <link href="{% static 'main/education-svg.svg' %}" rel="icon">
         <title>{% block title %}{% endblock %}</title>
         
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
@@ -15,12 +16,29 @@
         </style>
     </head>
     <body class="bg-[#daf0ee] text-[#3b413c] cusfont flex flex-col">
-        <header class="bg-[#94d1be] text-white text-xl font-bold py-4 text-center w-full flex flex-row justify-between">
-            <h1 onclick="location.href = '/';" class="hover:cursor-pointer text-3xl w-fit mx-2 px-1">VCGEN</h1>
+        <header class="bg-[#94d1be] text-white text-l font-bold py-4 text-center w-full flex flex-row justify-between">
+            <div class="flex items-center space-x-3 hover:scale-105 transition-all duration-300 ease-in-out drop-shadow-md ml-4 hover:cursor-pointer" onclick="location.href='/'">
+                {% load static %}
+                <img src="{% static 'main/education-svg.svg' %}" class="h-8" alt="logo"/>
+                <h1 
+                    class="text-3xl">
+                    VCGEN
+                </h1>
+            </div>
+            
             {% if name %}
             <div class="flex flex-row items-center">
+                {%load static%}
+                <img src="{% static 'main/person-svg.svg' %}" class="h-6" alt="profile picture"/>
                 <h1 class="m-2">{{name}}  </h1>
-                <button onclick="location.href = '/';" class="p-1 m-1 bg-[#94d1be] text-white rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Click To Log Out  </button>
+                <button onclick="location.href='/';" 
+                    class="mx-2 flex items-center gap-2 px-4 py-2 bg-[#3b413c] text-white font-semibold rounded-full shadow-md 
+                        hover:bg-[#2e3430] hover:scale-105 transition-all duration-300 ease-in-out hover:cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M18 12H9m9 0l-3-3m3 3l-3 3" />
+                    </svg>
+                    Logout
+                </button>
             </div>
             
             {% else %}

@@ -10,6 +10,7 @@ urlpatterns=[
     path("survey/<str:class_id>",views.survey,name="survey"),
     path("results/<str:class_id>",views.results,name="results"),
     path("dayplan/<str:class_id>",views.dayplan,name="dayplan"),
+    path('download_dayplan/<str:class_id>/', views.download_dayplan_pdf, name='download_dayplan'),
     path("classes/",views.classes,name="classes"),
     path("newclass/",views.newclass,name="newclass"),
     path("deleteclass/<str:class_id>",views.delete_class,name="delete_class"),

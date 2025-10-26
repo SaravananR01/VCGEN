@@ -8,7 +8,7 @@ Results
     <div class="w-11/12 bg-white m-2 p-8 rounded-lg shadow-lg border-2 border-[#94d1be] flex flex-col">
         <div class="flex w-full flex-row justify-between py-4 h-1/6">
             <div class="w-1/2 flex">
-                <button onclick="location.href = '/classes';" class="w-1/6 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
+                <button onclick="location.href = '/classes';" class="w-1/6 bg-[#94d1be] font-bold text-white text-lg p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
             </div>
             
             <div class="w-1/2 flex justify-end">
@@ -20,20 +20,54 @@ Results
             
         </div>
         
-        <h2 class="text-left text-2xl font-semibold text-[#3b413c] mb-6">{{cname}} - {{cid}}</h2>
-        <h3 class="text-left text-3xl font-semibold text-[#3b413c] mb-6">Results-</h2>
+        <h2 class="text-left text-3xl md:text-4xl font-bold cusfont text-[#2f4f4f] mb-4 tracking-wide">
+            {{ cname }}
+            <span class="text-[#94d1be] font-medium">({{ cid }})</span>
+        </h2>
+
+        <h3 class="text-left text-2xl md:text-3xl font-semibold cusfont text-[#3b413c] mb-8 relative">
+            <span class="bg-gradient-to-r from-[#94d1be] to-[#bfe3db] bg-clip-text text-transparent">
+                Results:
+            </span>
+            <div class="h-[3px] w-32 mt-2 bg-[#94d1be] rounded-full"></div>
+        </h3>
 
         {% for mod in modules %}
-            <div class="w-full p-8 rounded-lg shadow-lg border-2 border-[#94d1be] bg-[#9db5b2] text-xl m-2">
-                <h1 class="text-2xl text-left">{{forloop.counter}}. {{mod.mod.name}}</h1>
-                <ul class="list-disc list-inside ">
-                    {% for topic in mod.topicslist %}
-                        <li>{{topic.topic.content}} - {{topic.topic.mapped_skill}} - {{topic.teachertime}} + {{topic.studenttime}} = {{topic.time}}</li>
-                    {% endfor %}
-                </ul>
-                Total = {{mod.modtime}}
+        <div class="w-full p-6 md:p-8 rounded-2xl shadow-lg border-2 border-[#94d1be] bg-gradient-to-br from-[#bfe3db] to-[#9db5b2] text-[#3b413c] m-3 transition-all duration-300 hover:shadow-xl hover:scale-[1.01]">
+            <div class="flex justify-between items-center border-b-2 border-[#94d1be] pb-2 mb-4">
+                <h1 class="text-2xl md:text-3xl font-semibold cusfont">
+                    {{ forloop.counter }}. {{ mod.mod.name }}
+                </h1>
+                <span class="text-lg font-medium bg-[#94d1be] text-white px-3 py-1 rounded-full shadow-md">
+                    Total: {{ mod.modtime }} hrs
+                </span>
             </div>
+
+            <ul class="space-y-3">
+                {% for topic in mod.topicslist %}
+                <li class="p-4 bg-white rounded-xl shadow-sm border border-[#94d1be] hover:bg-[#f3faf9] transition-all duration-300">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center">
+                        <div class="flex-1">
+                            <p class="font-semibold text-lg">{{ topic.topic.content }}</p>
+                            <p class="text-sm text-[#3b413c]/70">Skill: 
+                                <span class="font-medium">{{ topic.topic.mapped_skill }}</span>
+                            </p>
+                        </div>
+                        <div class="mt-2 md:mt-0 text-sm md:text-base text-[#3b413c]/80">
+                            <span class="font-semibold">Teacher:</span> {{ topic.teachertime }} hrs  
+                            <span class="mx-1 text-[#3b413c]/50">|</span>  
+                            <span class="font-semibold">Student:</span> {{ topic.studenttime }} hrs  
+                            <span class="mx-1 text-[#3b413c]/50">=</span>  
+                            <span class="font-bold text-[#2e3430]">{{ topic.time }} hrs</span>
+                        </div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+
+        </div>
         {% endfor %}
+
 
     </div>
 </div>

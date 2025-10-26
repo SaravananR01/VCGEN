@@ -7,20 +7,20 @@ VCGEN
 {% block body %}
 <div class="flex h-screen bg-[#daf0ee]">
     <div class="flex-1 bg-[#94d1be] text-white flex items-center justify-center cursor-pointer hover:bg-[#9db5b2] transition duration-300" onclick="location.href = '/login';">
-        <div class="text-center">
+        <div class="text-center hover:scale-105 transition-all duration-300 ease-in-out">
             {%load static%}
-            <img src="{% static 'main/teacher-svg.svg' %}" alt="Faculty Icon" class="w-12 h-12 mb-4 mx-auto">
-            <h2 class="text-3xl font-bold">Faculty</h2>
-            <p class="mt-2 text-lg">Click here to access Faculty Login</p>
+            <img src="{% static 'main/teacher-svg.svg' %}" alt="Faculty Icon" class="w-16 h-16 mb-4 mx-auto">
+            <h2 class="text-4xl font-bold">Faculty</h2>
+            <p class="mt-2 text-xl">Click here to access Faculty Login</p>
         </div>
     </div>
 
     <div class="flex-1 bg-[#ffffff] text-[#3b413c] flex items-center justify-center cursor-pointer hover:bg-[#f1f5f3] transition duration-300" onclick="location.href = '/joinclass';">
-        <div class="text-center">
+        <div class="text-center hover:scale-105 transition-all duration-300 ease-in-out">
             {%load static%}
-            <img src="{% static 'main/student-svg.svg' %}" alt="Student Icon" class="w-12 h-12 mb-4 mx-auto">
-            <h2 class="text-3xl font-bold">Student</h2>
-            <p class="mt-2 text-lg">Click here to access Student Login</p>
+            <img src="{% static 'main/student-svg.svg' %}" alt="Student Icon" class="w-16 h-16 mb-4 mx-auto">
+            <h2 class="text-4xl font-bold">Student</h2>
+            <p class="mt-2 text-xl">Click here to Join a Class</p>
         </div>
     </div>
 </div>

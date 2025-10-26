@@ -8,6 +8,11 @@ import numpy as np
 from sentence_transformers import SentenceTransformer,util
 from transformers import pipeline
 #import torch
+from django.http import HttpResponse
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
+from io import BytesIO
 
 SKILLS = {
     "Problem Solving": "finding problems, thinking of solutions, and building programs that work step by step",
@@ -404,6 +409,98 @@ def dayplan(request,class_id):
         context['cname']=ourclass.name
         context['slots']=slots
     return render(request,"main/dayplan.html",context=context)
+
+def download_dayplan_pdf(request, class_id):
+    if 'user' not in request.session:
+        return redirect('login')
+
+    ourclass=Course.objects.filter(course_id=class_id).first()
+    if not ourclass:
+        return redirect('classes')
+
+    modules=Module.objects.filter(course=ourclass)
+
+    class cusModule:
+        def __init__(self,mod):
+            self.mod=mod
+            self.topicslist=[]
+            self.modtime=0
+        def addtopic(self,topic):
+            self.topicslist.append(topic)
+            self.modtime+=topic.time
+
+    class cusTopic:
+        def __init__(self,topic,teachertime,studenttime):
+            self.topic=topic
+            self.teachertime=teachertime
+            self.studenttime=studenttime
+            self.time = teachertime + studenttime
+
+    ourmods=[]
+    for mod in modules:
+        newmod=cusModule(mod)
+        for topic in Topics.objects.filter(module=mod):
+            teachertime=round(topic.teacherweight*mod.hours*ourclass.split,2)
+            studenttime=round(topic.studentweight*ourclass.hours*(100-(ourclass.split*100))/100,2)
+            newtopic=cusTopic(topic,teachertime,studenttime)
+            newmod.addtopic(newtopic)
+        ourmods.append(newmod)
+
+    class slot:
+        def __init__(self,content,mod):
+            self.content=content
+            self.mod=mod
+
+    slots=[]
+    cur=0
+    tempcontent,tempmod="",""
+    lastcontent,lastmod="",""
+    for mod in ourmods:
+        for topic in mod.topicslist:
+            tempcontent+=topic.topic.content+", "
+            lastcontent=topic.topic.content
+            if mod.mod.name not in tempmod:
+                tempmod+=mod.mod.name+", "
+                lastmod=mod.mod.name
+            cur += topic.time
+            while cur > 1:
+                tempcontent=tempcontent.rstrip(", ")
+                tempmod=tempmod.rstrip(", ")
+                slots.append(slot(tempcontent, tempmod))
+                if cur==1:
+                    cur=0
+                    tempcontent, tempmod = "", ""
+                elif cur>1:
+                    cur-=1
+                    tempcontent=lastcontent + ", "
+                    tempmod=lastmod + ", "
+    tempcontent=tempcontent.rstrip(", ")
+    tempmod=tempmod.rstrip(", ")
+    slots.append(slot(tempcontent, tempmod))
+
+    buffer=BytesIO()
+    doc=SimpleDocTemplate(buffer, pagesize=A4)
+    styles=getSampleStyleSheet()
+    elements=[]
+
+    elements.append(Paragraph(f"<b>{ourclass.name} - {class_id}</b>", styles['Title']))
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph("Day-wise Plan", styles['Heading2']))
+    elements.append(Spacer(1, 10))
+
+    for i, s in enumerate(slots, 1):
+        elements.append(Paragraph(f"<b>Hour {i}:</b> {s.mod}", styles['Heading3']))
+        elements.append(Paragraph(s.content, styles['Normal']))
+        elements.append(Spacer(1, 8))
+
+    doc.build(elements)
+
+    pdf=buffer.getvalue()
+    buffer.close()
+
+    response=HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="dayplan_{class_id}.pdf"'
+    return response
 
 def classes(request):
     context={}
