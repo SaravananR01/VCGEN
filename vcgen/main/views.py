@@ -1,83 +1,301 @@
 from django.shortcuts import render,redirect
 
 from .models import Teacher,Course,Module,Topics,Student
-import random
-import re
+import random,re,os
 import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer,util
 from transformers import pipeline
-#import torch
 from django.http import HttpResponse
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from io import BytesIO
 
-SKILLS = {
-    "Problem Solving": "finding problems, thinking of solutions, and building programs that work step by step",
-    "Algorithmic Thinking": "breaking tasks into clear steps, planning methods, and comparing ways to solve problems efficiently",
-    "Analytical Thinking": "examining how programs and algorithms behave, spotting issues, and improving them",
-    "Efficiency Awareness": "understanding how fast and how much memory a program uses and improving its performance",
-    "Critical Thinking": "questioning results, comparing different approaches, and deciding what works best",
-    "Logical Reasoning": "using clear rules and reasoning to prove how programs or systems behave",
-    "Programming Basics": "writing simple programs, using loops, functions, and variables in common languages",
-    "Data Handling": "organizing and using information with lists, trees, or tables for better performance",
-    "Modular Design": "dividing programs into smaller reusable parts and keeping code organized",
-    "Object-Oriented Thinking": "creating programs using real-world models with objects, classes, and inheritance",
-    "Software Design": "planning and organizing how programs are structured and how parts work together",
-    "Formal Language Understanding": "knowing how computers read, understand, and translate code through grammars or compilers",
-    "Code Improvement": "cleaning, simplifying, and optimizing code to make it faster and easier to read",
-    "Computer System Understanding": "learning how computers process data, store information, and run instructions",
-    "Database Design": "structuring information, linking related data, and keeping it well organized for storage",
-    "Data Retrieval": "getting information quickly using indexes, search methods, and sorting techniques",
-    "Smart Querying": "writing database questions that run faster and give the right results",
-    "System Management": "understanding how systems use memory, processing, and files to work efficiently",
-    "Task Coordination": "managing multiple operations or programs running at the same time safely and smoothly",
-    "Reliability Awareness": "ensuring systems recover from errors and keep working correctly",
-    "Networking Basics": "understanding how computers share data safely and efficiently over networks",
-    "Information Security": "keeping systems and information safe from unauthorized access or attacks",
-    "Creative Problem Solving": "finding unique or alternate ways to reach a goal or improve performance",
-    "Hardware Interaction": "understanding how computers connect to sensors and other devices to perform tasks",
-    "Mathematical Thinking": "using logic, patterns, and numbers to design and analyze algorithms",
-    "Project Planning": "organizing work, setting goals, and completing programming or research projects",
-    "Requirements Understanding": "knowing what a system needs to do and how to translate those needs into design plans",
-    "Process Understanding": "knowing how software or systems evolve through different stages of development",
-    "Testing and Validation": "checking that programs work correctly and improving them through feedback",
-    "Quality Awareness": "making sure work follows good practices and produces reliable results"
-}
+from dataclasses import dataclass
+from typing import List, Dict, Any
+import json
+
+@dataclass
+class ScoreDict:
+    scores: Dict[str, float]
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "").lower()).strip()
+
+def _as_list(x):
+    if isinstance(x, list): return x
+    if isinstance(x, str) and x.strip():
+        try:
+            v = json.loads(x)
+            if isinstance(v, list): return v
+        except Exception:
+            pass
+        return [t.strip() for t in re.split(r"[|,]", x) if t.strip()]
+    return []
+
+def _prefix_regex(items):
+    # represent regex cues as 're:<pattern>'
+    out = []
+    for it in items or []:
+        it = (it or "").strip()
+        if it:
+            out.append(f"re:{it}")
+    return out
+
+def load_skill_repo_csv(csv_path: str):
+    """
+    Normalizes the new cued CSV into:
+      skill: str
+      pos:   List[str]          (aliases + keywords + legacy positives, normalized)
+      proto: List[str]          (symbol literals + 're:<pattern>' for regex_cues)
+      neg:   List[str]          (legacy negatives + 're:<pattern>' for negative_cues)
+      student_title, student_desc: passthrough if present
+    """
+    df = pd.read_csv(csv_path)
+
+    repo = []
+    for _, r in df.iterrows():
+        skill = str(r.get("skill","")).strip()
+        if not skill:
+            continue
+
+        # positives / aliases / keywords
+        legacy_pos = _as_list(r.get("positives",""))
+        aliases    = _as_list(r.get("aliases",""))
+        keywords   = _as_list(r.get("keywords",""))
+        pos = list(dict.fromkeys([_norm(x) for x in (legacy_pos + aliases + keywords) if x]))
+
+        # strong cues: symbols (literal) + regex (prefixed)
+        symbols = _as_list(r.get("symbol_cues",""))
+        regexes = _as_list(r.get("regex_cues",""))
+        proto   = list(dict.fromkeys([*(x for x in symbols if x), *(_prefix_regex(regexes))]))
+
+        # negatives: legacy + negative regex
+        legacy_neg = _as_list(r.get("negatives",""))
+        neg_regex  = _as_list(r.get("negative_cues",""))
+        neg        = list(dict.fromkeys([_norm(x) for x in legacy_neg if x] + _prefix_regex(neg_regex)))
+
+        repo.append({
+            "skill": skill,
+            "pos": pos,
+            "proto": proto,
+            "neg": neg,
+            "student_title": r.get("student_title","") or "",
+            "student_desc":  r.get("student_desc","") or "",
+        })
+    return repo
+
+def _has_kw_hit(row: dict, text: str):
+    """Return True if any pos/proto hits (supports 're:' patterns and symbol literals)."""
+    t_norm = _norm(text)
+    t_raw  = text or ""
+    # pos (literal on normalized)
+    for p in row.get("pos", []):
+        if _norm(p) in t_norm:
+            return True
+    # proto (regex or literal symbol on raw)
+    for p in row.get("proto", []):
+        if isinstance(p, str) and p.startswith("re:"):
+            pat = p[3:].strip()
+            try:
+                if re.search(pat, t_raw, flags=re.I):
+                    return True
+            except re.error:
+                if _norm(pat) in t_norm:
+                    return True
+        else:
+            if str(p) in t_raw:
+                return True
+    return False
+# ---------- end helpers ----------
+
+# 1) keyword scorer (reuse your helpers)
+def keyword_score(text: str, row: Dict, *, cap:int=8, proto_boost:float=1.5) -> float:
+    """
+    Supports:
+      - row['pos'] as literal (normalized) matches
+      - row['proto'] elements either 're:<pattern>' (regex on raw text) or literal symbols
+      - row['neg'] same as above; any hit → 0.0
+    """
+    t_norm = _norm(text)
+    t_raw  = text or ""
+    if not t_norm:
+        return 0.0
+
+    # negatives block
+    for n in row.get("neg", []):
+        if isinstance(n, str) and n.startswith("re:"):
+            pat = n[3:].strip()
+            try:
+                if re.search(pat, t_raw, flags=re.I):
+                    return 0.0
+            except re.error:
+                if _norm(pat) in t_norm:
+                    return 0.0
+        else:
+            if _norm(n) in t_norm:
+                return 0.0
+
+    # positives (literal contains on normalized)
+    pos = [p for p in row.get("pos", []) if p]
+    hits_pos = sum(1 for p in pos if _norm(p) in t_norm)
+
+    # prototypes (regex or literal on raw text)
+    proto = [p for p in row.get("proto", []) if p]
+    hits_pro = 0
+    for p in proto:
+        if isinstance(p, str) and p.startswith("re:"):
+            pat = p[3:].strip()
+            try:
+                if re.search(pat, t_raw, flags=re.I):
+                    hits_pro += 1
+            except re.error:
+                if _norm(pat) in t_norm:
+                    hits_pro += 1
+        else:
+            if str(p) in t_raw:
+                hits_pro += 1
+
+    hits = hits_pos + proto_boost * hits_pro
+    total = min(cap, len(pos) + len(proto)) or 1
+    return float(hits) / float(total)
+
+# 2) Hugging Face Zero-shot with BART MNLI
+_zs_pipe = None
+def zero_shot_scores(text: str, labels: List[str]) -> ScoreDict:
+    global _zs_pipe
+    try:
+        if _zs_pipe is None:
+            _zs_pipe = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device_map="auto")
+        res = _zs_pipe(text, candidate_labels=labels, multi_label=True)
+        out = {lab: 0.0 for lab in labels}
+        for lab, sc in zip(res["labels"], res["scores"]):
+            if lab in out:
+                out[lab] = float(sc)
+        return ScoreDict(out)
+    except Exception:
+        # no internet/GPU/etc → uniform
+        u = 1.0 / max(1, len(labels))
+        return ScoreDict({lab: u for lab in labels})
+
+# 3) Sentence embeddings (cosine sim)
+_embed_model = None
+def embed_scores(text: str, labels: List[str]) -> ScoreDict:
+    global _embed_model
+    try:
+        if _embed_model is None:
+            from sentence_transformers import SentenceTransformer, util
+            _embed_model = (SentenceTransformer("all-MiniLM-L6-v2"), None)  # cache util in closure below
+            _embed_model[0].max_seq_length = 256
+        from sentence_transformers import util
+        model = _embed_model[0]
+        a = model.encode([text], normalize_embeddings=True, convert_to_numpy=True)
+        b = model.encode(labels, normalize_embeddings=True, convert_to_numpy=True)
+        sims = (a @ b.T).ravel()  # cosine because normalized
+        # map from [-1,1] (theoretically) to [0,1] safeguard
+        sims = (sims + 1.0) / 2.0
+        return ScoreDict({lab: float(sc) for lab, sc in zip(labels, sims.tolist())})
+    except Exception:
+        u = 1.0 / max(1, len(labels))
+        return ScoreDict({lab: u for lab in labels})
+
+# 4) Blend scores
+def blend_scores(zs: ScoreDict, em: ScoreDict, kw: Dict[str, float],
+                 labels: List[str], w_zs=0.40, w_emb=0.35, w_kw=0.25) -> Dict[str, float]:
+    blended = {}
+    for lab in labels:
+        z = zs.scores.get(lab, 0.0)
+        e = em.scores.get(lab, 0.0)
+        k = kw.get(lab, 0.0)
+        blended[lab] = w_zs*z + w_emb*e + w_kw*k
+    return blended
+
+# 5) Repo-only fallback (no hardcoded skill names) for 0-hit cases
+def _tokenize_blob(*parts: str):
+    blob = _norm(" ".join(parts))
+    return [t for t in re.findall(r"[a-z0-9]+", blob) if len(t) >= 3]
+
+def _fallback_by_repo_only(topic: str, repo_rows: List[Dict]) -> Dict:
+    t_tokens = _tokenize_blob(topic)
+    best_row, best_score = None, -1e9
+    for r in repo_rows:
+        meta_tokens = _tokenize_blob(r["skill"], r["student_title"], r["student_desc"])
+        score = len(set(t_tokens) & set(meta_tokens)) + 0.1*(len(r["pos"]) + len(r["proto"]))
+        if score > best_score:
+            best_row, best_score = r, score
+    return best_row or repo_rows[0]
+
+# 6) Main HF-blended mapper (uses your CSV loader)
+def map_topics_HF_blend(topics: List[str],
+                        csv_path: str,
+                        min_confidence: float = 0.55,
+                        require_kw_hit: bool = False,
+                        w_zs=0.40, w_emb=0.35, w_kw=0.25) -> pd.DataFrame:
+    """
+    - Blends HF zero-shot + embeddings + your keyword score.
+    - If `require_kw_hit=True`, only accept mappings that matched at least one repo cue;
+      otherwise we allow HF-only mappings too.
+    - Uses a repo-only fallback when absolutely nothing matches (so nothing is 'Unmapped').
+    """
+    repo = load_skill_repo_csv(csv_path)
+    labels = [r["skill"] for r in repo]
+    out_rows = []
+
+    for t in topics:
+        # compute per-label scores
+        kw_scores = {r["skill"]: keyword_score(t, r) for r in repo}
+        zs = zero_shot_scores(t, labels)
+        em = embed_scores(t, labels)
+        blended = blend_scores(zs, em, kw_scores, labels, w_zs=w_zs, w_emb=w_emb, w_kw=w_kw)
+
+        # pick best label
+        pred = max(blended, key=blended.get)
+        conf = float(blended[pred])
+
+        # optionally require at least one keyword/prototype hit
+        row_pred = next(r for r in repo if r["skill"] == pred)
+        has_kw = _has_kw_hit(row_pred, t)
+        kw_hits = []  # optional: collect for logging if you want (costs extra regex scans)
 
 
-LABELS = list(SKILLS.keys())
-LABEL_TEXTS = [f"{k}: {v}" for k, v in SKILLS.items()]
+        # If we insist on keyword support but we don't have it, try the next best with a hit
+        if require_kw_hit and not has_kw:
+            # sort by blended score, pick first with a kw hit
+            for alt in sorted(labels, key=lambda L: blended[L], reverse=True):
+              row_alt = next(r for r in repo if r["skill"] == alt)
+              if _has_kw_hit(row_alt, t):
+                pred = alt
+                conf = float(blended[pred])
+                kw_hits = []   # optional
+                has_kw = True
+                break
 
-#device = 0 if torch.cuda.is_available() else -1
 
-zshot = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")#, device=device)
-encodings = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-#encodings = encodings.to(device)
-skills_embs = encodings.encode(LABELS,normalize_embeddings=True)
+        # if nothing has a hit and confidence is still tiny, use repo-only fallback
+        used_fallback = False
+        if not has_kw and conf < min_confidence:
+            fb = _fallback_by_repo_only(t, repo)
+            pred = fb["skill"]
+            conf = float(blended.get(pred, 0.0))
+            kw_hits = []  # be explicit: this came via fallback
+            used_fallback = True
 
-def zero_shot_label(text,labels=LABELS):
-  out = zshot(text,labels,multi_label=False)
-  return dict(pred=out["labels"][0],conf=float(out["scores"][0]),scores=dict(zip(out["labels"],out["scores"])))
+        # gather student fields
+        rmap = {r["skill"]: r for r in repo}
+        student_title = rmap[pred]["student_title"]
+        why = rmap[pred]["student_desc"]
 
-def embed_label(text):
-  v = encodings.encode([text],normalize_embeddings=True)[0]
-  cs = util.cos_sim(v,skills_embs).flatten().tolist() # Corrected variable name to skills_embs
-  idx = int(np.argmax(cs))
-  return dict(pred=LABELS[idx],conf=float(cs[idx]),scores=dict(zip(LABELS,cs)))
+        out_rows.append({
+            "topic": t,
+            "skill": pred,
+            "skill_student": student_title,
+            "confidence": round(conf, 4),
+            "kw_hits": "; ".join(kw_hits),
+            "needs_review": used_fallback or (conf < min_confidence and not has_kw)
+        })
 
-def ensemble_label(text, w_zs=0.5, w_emb=0.5, tau=0.55):
-    zs = zero_shot_label(text)
-    em = embed_label(text)
-    # Normalize cosine to 0..1 for blending
-    em01 = {k: (v+1)/2 for k,v in em["scores"].items()}
-    labels = LABELS
-    blended = {k: w_zs*zs["scores"][k] + w_emb*em01[k] for k in labels}
-    pred = max(blended, key=blended.get)
-    conf = blended[pred]
-    return dict(pred=pred, conf=conf, review=conf<tau, zs=zs, em=em, blended=blended)
+    return pd.DataFrame(out_rows)
 
 def gen_teacher_id():
     code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
@@ -570,14 +788,14 @@ def newclass(request):
             text=text.replace(", and",", ")
             pattern=r' - | – |,'
             topicslist =re.split(pattern, text)'''
-
-            for topic in topicslist:
-                mappedval=ensemble_label(topic)['pred']
+            fnresult=map_topics_HF_blend(topicslist,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
+            for i,topic in enumerate(topicslist):
+                #mappedval=ensemble_label(topic)['pred']
                 newtopic=Topics.objects.create(
                     topic_id=gen_topic_id(),
                     module=newmod,
                     content=topic,
-                    mapped_skill=mappedval,
+                    mapped_skill=fnresult[i],
                     teacherweight=0,
                     studentweight=0,
                 )
