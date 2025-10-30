@@ -760,6 +760,8 @@ def newclass(request):
             text=text.replace(", and",", ")
             text=text.replace(" - ","$$$")
             text=text.replace(" – ","$$$")
+            text=text.replace("- ","$$$")
+            text=text.replace(" -","$$$")
             brackettrue=False
             op=""
             for x in text:
