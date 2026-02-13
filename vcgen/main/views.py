@@ -11,6 +11,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from io import BytesIO
+from .pdf_parser import parse_syllabus_pdf
 
 from dataclasses import dataclass
 from typing import List, Dict, Any
@@ -735,6 +736,15 @@ def newclass(request):
         return redirect('login')
     else:
         context['name']=Teacher.objects.filter(teacher_id=request.session['user'])[0].name
+    
+    if request.method=='POST' and 'syllabus_pdf' in request.FILES:
+        parsed_modules=parse_syllabus_pdf(request.FILES['syllabus_pdf'])
+        context['parsed_modules']=parsed_modules
+        for i in parsed_modules:
+            print(i)
+        print("Length of PDF: ",len(parsed_modules))
+        return render(request,"main/newclass.html",context)
+    
     if request.method=='POST':
         faculty=Teacher.objects.filter(teacher_id=request.session['user'])[0]
         newcourse=Course.objects.create(
