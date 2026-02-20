@@ -20,6 +20,7 @@ class Course(models.Model):
     name=models.CharField(max_length=20)
     hours=models.IntegerField()
     split=models.DecimalField(decimal_places=3,max_digits=10)
+    accepting_response=models.BooleanField(default=True)
 
 class Module(models.Model):
     module_id=models.CharField(max_length=8,primary_key=True)

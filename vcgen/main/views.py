@@ -904,3 +904,13 @@ def delete_class(request,class_id):
             todelete=todelete[0]
             todelete.delete()
     return redirect('/classes')
+
+def closeresponses(request,class_id):
+    context={}
+    if 'user' not in request.session:
+        return redirect('login')
+    else:
+        toclose=Course.objects.filter(course_id=class_id)
+        if toclose.accepting_response:
+            toclose.accepting_response=False
+            toclose.save()
