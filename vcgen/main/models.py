@@ -32,7 +32,7 @@ class Topics(models.Model):
     topic_id=models.CharField(max_length=8,primary_key=True)
     module=models.ForeignKey(Module,on_delete=models.CASCADE)
     content=models.CharField(max_length=100)
-    mapped_skill=models.CharField(max_length=100)
+    mapped_skill=models.JSONField()
     teacherweight=models.DecimalField(decimal_places=3,max_digits=10)
     studentweight=models.DecimalField(decimal_places=3,max_digits=10)
 

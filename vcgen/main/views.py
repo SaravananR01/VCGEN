@@ -44,46 +44,17 @@ def _prefix_regex(items):
             out.append(f"re:{it}")
     return out
 
-def load_skill_repo_csv(csv_path: str):
-    """
-    Normalizes the new cued CSV into:
-      skill: str
-      pos:   List[str]          (aliases + keywords + legacy positives, normalized)
-      proto: List[str]          (symbol literals + 're:<pattern>' for regex_cues)
-      neg:   List[str]          (legacy negatives + 're:<pattern>' for negative_cues)
-      student_title, student_desc: passthrough if present
-    """
+def load_skill_repo_csv(csv_path):
     df = pd.read_csv(csv_path)
 
-    repo = []
-    for _, r in df.iterrows():
-        skill = str(r.get("skill","")).strip()
-        if not skill:
-            continue
-
-        # positives / aliases / keywords
-        legacy_pos = _as_list(r.get("positives",""))
-        aliases    = _as_list(r.get("aliases",""))
-        keywords   = _as_list(r.get("keywords",""))
-        pos = list(dict.fromkeys([_norm(x) for x in (legacy_pos + aliases + keywords) if x]))
-
-        # strong cues: symbols (literal) + regex (prefixed)
-        symbols = _as_list(r.get("symbol_cues",""))
-        regexes = _as_list(r.get("regex_cues",""))
-        proto   = list(dict.fromkeys([*(x for x in symbols if x), *(_prefix_regex(regexes))]))
-
-        # negatives: legacy + negative regex
-        legacy_neg = _as_list(r.get("negatives",""))
-        neg_regex  = _as_list(r.get("negative_cues",""))
-        neg        = list(dict.fromkeys([_norm(x) for x in legacy_neg if x] + _prefix_regex(neg_regex)))
-
+    repo=[]
+    for _,r in df.iterrows():
         repo.append({
-            "skill": skill,
-            "pos": pos,
-            "proto": proto,
-            "neg": neg,
-            "student_title": r.get("student_title","") or "",
-            "student_desc":  r.get("student_desc","") or "",
+            "skill": r["skill"],
+            "pos": _as_list(r.get("keywords","")),
+            "proto": _prefix_regex(_as_list(r.get("regex_cues",""))),
+            "student_title": r.get("student_title",""),
+            "student_desc": r.get("student_desc",""),
         })
     return repo
 
@@ -228,75 +199,198 @@ def _fallback_by_repo_only(topic: str, repo_rows: List[Dict]) -> Dict:
     return best_row or repo_rows[0]
 
 # 6) Main HF-blended mapper (uses your CSV loader)
-def map_topics_HF_blend(topics: List[str],
-                        csv_path: str,
-                        min_confidence: float = 0.55,
-                        require_kw_hit: bool = False,
-                        w_zs=0.40, w_emb=0.35, w_kw=0.25) -> pd.DataFrame:
-    """
-    - Blends HF zero-shot + embeddings + your keyword score.
-    - If `require_kw_hit=True`, only accept mappings that matched at least one repo cue;
-      otherwise we allow HF-only mappings too.
-    - Uses a repo-only fallback when absolutely nothing matches (so nothing is 'Unmapped').
-    """
+# def map_topics_HF_blend(topics: List[str],
+#                         csv_path: str,
+#                         min_confidence: float = 0.55,
+#                         require_kw_hit: bool = False,
+#                         w_zs=0.40, w_emb=0.35, w_kw=0.25) -> pd.DataFrame:
+#     """
+#     - Blends HF zero-shot + embeddings + your keyword score.
+#     - If `require_kw_hit=True`, only accept mappings that matched at least one repo cue;
+#       otherwise we allow HF-only mappings too.
+#     - Uses a repo-only fallback when absolutely nothing matches (so nothing is 'Unmapped').
+#     """
+#     repo = load_skill_repo_csv(csv_path)
+#     labels = [r["skill"] for r in repo]
+#     out_rows = []
+
+#     for t in topics:
+#         # compute per-label scores
+#         kw_scores = {r["skill"]: keyword_score(t, r) for r in repo}
+#         zs = zero_shot_scores(t, labels)
+#         em = embed_scores(t, labels)
+#         blended = blend_scores(zs, em, kw_scores, labels, w_zs=w_zs, w_emb=w_emb, w_kw=w_kw)
+
+#         # pick best label
+#         # pred = max(blended, key=blended.get)
+#         # conf = float(blended[pred])
+
+#         THRESHOLD = 0.45   # tune 0.40–0.55
+
+#         selected = [lab for lab,sc in blended.items() if sc >= THRESHOLD]
+
+#         if not selected:
+#             selected = [max(blended, key=blended.get)]
+
+#         pred = "|".join(selected) 
+#         conf = max(blended.values())
+
+#         # optionally require at least one keyword/prototype hit
+#         row_pred = next(r for r in repo if r["skill"] == pred)
+#         has_kw = _has_kw_hit(row_pred, t)
+#         kw_hits = []  # optional: collect for logging if you want (costs extra regex scans)
+
+
+#         # If we insist on keyword support but we don't have it, try the next best with a hit
+#         if require_kw_hit and not has_kw:
+#             # sort by blended score, pick first with a kw hit
+#             for alt in sorted(labels, key=lambda L: blended[L], reverse=True):
+#               row_alt = next(r for r in repo if r["skill"] == alt)
+#               if _has_kw_hit(row_alt, t):
+#                 pred = alt
+#                 conf = float(blended[pred])
+#                 kw_hits = []   # optional
+#                 has_kw = True
+#                 break
+
+
+#         # if nothing has a hit and confidence is still tiny, use repo-only fallback
+#         used_fallback = False
+#         if not has_kw and conf < min_confidence:
+#             fb = _fallback_by_repo_only(t, repo)
+#             pred = fb["skill"]
+#             conf = float(blended.get(pred, 0.0))
+#             kw_hits = []  # be explicit: this came via fallback
+#             used_fallback = True
+
+#         # gather student fields
+#         rmap = {r["skill"]: r for r in repo}
+#         student_title = rmap[pred]["student_title"]
+#         why = rmap[pred]["student_desc"]
+
+#         out_rows.append({
+#             "topic": t,
+#             "skill": pred,
+#             "skill_student": student_title,
+#             "confidence": round(conf, 4),
+#             "kw_hits": "; ".join(kw_hits),
+#             "needs_review": used_fallback or (conf < min_confidence and not has_kw)
+#         })
+
+#     return pd.DataFrame(out_rows)
+
+def map_topics_HF_blend(topics,
+                        subject_context,
+                        csv_path,
+                        threshold=0.35,
+                        top_k=3,
+                        w_zs=0.35, w_emb=0.35, w_kw=0.30):
+
     repo = load_skill_repo_csv(csv_path)
     labels = [r["skill"] for r in repo]
-    out_rows = []
 
-    for t in topics:
-        # compute per-label scores
-        kw_scores = {r["skill"]: keyword_score(t, r) for r in repo}
-        zs = zero_shot_scores(t, labels)
-        em = embed_scores(t, labels)
-        blended = blend_scores(zs, em, kw_scores, labels, w_zs=w_zs, w_emb=w_emb, w_kw=w_kw)
+    rows = []
 
-        # pick best label
-        pred = max(blended, key=blended.get)
-        conf = float(blended[pred])
+    for topic in topics:
+        enriched=f"{subject_context}: {topic}" if subject_context else topic
+        kw_scores = {r["skill"]: keyword_score(topic, r) for r in repo}
 
-        # optionally require at least one keyword/prototype hit
-        row_pred = next(r for r in repo if r["skill"] == pred)
-        has_kw = _has_kw_hit(row_pred, t)
-        kw_hits = []  # optional: collect for logging if you want (costs extra regex scans)
+        zs = zero_shot_scores(enriched, labels)
+        em = embed_scores(enriched, labels)
 
+        blended = blend_scores(zs, em, kw_scores, labels,
+                               w_zs=w_zs, w_emb=w_emb, w_kw=w_kw)
 
-        # If we insist on keyword support but we don't have it, try the next best with a hit
-        if require_kw_hit and not has_kw:
-            # sort by blended score, pick first with a kw hit
-            for alt in sorted(labels, key=lambda L: blended[L], reverse=True):
-              row_alt = next(r for r in repo if r["skill"] == alt)
-              if _has_kw_hit(row_alt, t):
-                pred = alt
-                conf = float(blended[pred])
-                kw_hits = []   # optional
-                has_kw = True
-                break
+        sorted_labels = sorted(labels, key=lambda x: blended[x], reverse=True)
 
+        chosen = [
+            lab for lab in sorted_labels
+            if blended[lab] >= threshold
+        ][:top_k]
 
-        # if nothing has a hit and confidence is still tiny, use repo-only fallback
-        used_fallback = False
-        if not has_kw and conf < min_confidence:
-            fb = _fallback_by_repo_only(t, repo)
-            pred = fb["skill"]
-            conf = float(blended.get(pred, 0.0))
-            kw_hits = []  # be explicit: this came via fallback
-            used_fallback = True
+        if not chosen:
+            chosen = [sorted_labels[0]]
 
-        # gather student fields
-        rmap = {r["skill"]: r for r in repo}
-        student_title = rmap[pred]["student_title"]
-        why = rmap[pred]["student_desc"]
+        rows.append({
+            "topic": topic,
+            "skill": chosen,
+            "confidence": {lab: round(blended[lab], 4) for lab in chosen}
+        })
+    print(pd.DataFrame(rows))
 
-        out_rows.append({
-            "topic": t,
-            "skill": pred,
-            "skill_student": student_title,
-            "confidence": round(conf, 4),
-            "kw_hits": "; ".join(kw_hits),
-            "needs_review": used_fallback or (conf < min_confidence and not has_kw)
+    return pd.DataFrame(rows)
+
+BLOOM_LABELS = [
+    "remembering and recalling definitions or facts",
+    "understanding and explaining concepts or models",
+    "applying procedures or algorithms to solve problems",
+    "analyzing relationships, proofs, or structures",
+    "evaluating trade-offs or comparing approaches",
+    "creating, designing, or constructing something new",
+]
+
+BLOOM_TO_SKILL = {
+    "remembering and recalling definitions or facts":
+        ["Conceptual Understanding"],
+    "understanding and explaining concepts or models":
+        ["Conceptual Understanding", "Communication & Expression"],
+    "applying procedures or algorithms to solve problems":
+        ["Problem Solving & Application"],
+    "analyzing relationships, proofs, or structures":
+        ["Problem Solving & Application", "Conceptual Understanding"],
+    "evaluating trade-offs or comparing approaches":
+        ["Research & Inquiry", "Problem Solving & Application"],
+    "creating, designing, or constructing something new":
+        ["Design & Creation"],
+}
+
+def map_topics_via_bloom(
+        topics,
+        subject_context,
+        csv_path,
+        bloom_threshold: float = 0.25, 
+        top_k: int = 3,
+) -> pd.DataFrame:
+
+    repo = load_skill_repo_csv(csv_path)
+    valid_skills = {r["skill"] for r in repo}
+
+    rows = []
+    for topic in topics:
+        enriched = f"{subject_context}: {topic}" if subject_context else topic
+
+        bloom_result = zero_shot_scores(enriched, BLOOM_LABELS)
+        bloom_scores = bloom_result.scores
+
+        top_bloom_score = max(bloom_scores.values())
+        dynamic_floor   = max(0.15, top_bloom_score * (1 - bloom_threshold))
+
+        selected_bloom = [
+            label for label, score in bloom_scores.items()
+            if score >= dynamic_floor
+        ][:top_k]
+
+        skill_set = []
+        for bl in selected_bloom:
+            for skill in BLOOM_TO_SKILL.get(bl, []):
+                if skill in valid_skills and skill not in skill_set:
+                    skill_set.append(skill)
+
+        skill_set = skill_set[:top_k]
+        if not skill_set:
+            skill_set = BLOOM_TO_SKILL[max(bloom_scores, key=bloom_scores.get)]
+
+        rows.append({
+            "topic":      topic,
+            "bloom":      selected_bloom,      
+            "skill":      skill_set,
+            "confidence": {
+                bl: round(bloom_scores[bl], 4)
+                for bl in selected_bloom
+            },
         })
 
-    return pd.DataFrame(out_rows)
+    return pd.DataFrame(rows)
 
 def gen_teacher_id():
     code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
@@ -800,7 +894,10 @@ def newclass(request):
             text=text.replace(", and",", ")
             pattern=r' - | – |,'
             topicslist =re.split(pattern, text)'''
-            fnresult=map_topics_HF_blend(topicslist,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
+            subject=request.POST['cname']
+            print(subject)
+            #fnresult=map_topics_HF_blend(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
+            fnresult=map_topics_via_bloom(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
             for i,topic in enumerate(topicslist):
                 #mappedval=ensemble_label(topic)['pred']
                 newtopic=Topics.objects.create(
@@ -914,3 +1011,37 @@ def closeresponses(request,class_id):
         if toclose.accepting_response:
             toclose.accepting_response=False
             toclose.save()
+
+def update_progress(request,class_id):
+    context={}
+    if 'user' not in request.session:
+        return redirect('login')
+    else:
+        context['name']=Teacher.objects.filter(teacher_id=request.session['user'])[0].name
+    ourclass=Course.objects.filter(course_id=class_id)
+    if len(ourclass)<1:
+        return redirect('classes')
+    else:
+        class cusModule:
+            def __init__(self,mod):
+                self.name=mod.name
+                self.hours=mod.hours
+                self.topics=[]
+            
+            def addtopic(self,topic):
+                self.topics.append(topic)
+
+        ourclass=ourclass[0]
+        datamodules=[]
+        modules=Module.objects.filter(course=ourclass)
+        for mod in modules:
+            curmod=cusModule(mod)
+            for topic in Topics.objects.filter(module=mod):
+                curmod.addtopic(topic)
+            datamodules.append(curmod)
+
+        context['cid']=class_id
+        context['cname']=ourclass.name
+        context['modules']= datamodules
+        print(context)
+    return render(request,"main/dynamic.html",context=context)

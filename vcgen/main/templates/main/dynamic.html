@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}
+Update Schedule
+{% endblock %}
+
+{% block body %}
+<button onclick="location.href = '/results/{{cid}}';" class="absolute top-20 left-4 w-1/10 bg-[#94d1be] font-bold text-white text-lg p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
+<div class="max-w-4xl mx-auto bg-[#ffffff] shadow-xl rounded-2xl p-8">
+    <h1 class="text-3xl font-bold mb-6 text-[#3b413c]">
+        Update Course Progress
+    </h1>
+
+    <form method="POST" class="space-y-8">
+        {% csrf_token %}
+
+        <div class="bg-[#daf0ee] p-6 rounded-xl">
+            <h2 class="text-xl font-semibold mb-4 text-[#3b413c]">
+                {{ cname }} - {{ cid }}
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-6">
+
+                <div>
+                    <label class="block text-sm font-medium text-[#3b413c]">
+                        Total Course Hours
+                    </label>
+                    <input
+                        type="number"
+                        name="total_hours"
+                        class="mt-1 w-full rounded-lg border border-[#9db5b2] px-3 py-2 focus:ring-2 focus:ring-[#94d1be] focus:outline-none"
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-[#3b413c]">
+                        Hours Completed So Far
+                    </label>
+                    <input
+                        type="number"
+                        name="completed_hours"
+                        class="mt-1 w-full rounded-lg border border-[#9db5b2] px-3 py-2 focus:ring-2 focus:ring-[#94d1be] focus:outline-none"
+                        required
+                    >
+                </div>
+
+            </div>
+        </div>
+
+        <div class="space-y-6">
+
+            {% for module in modules %}
+            <div class="border border-[#9db5b2] rounded-xl p-6 bg-[#ffffff]">
+
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-[#3b413c]">
+                        {{ module.name }}
+                    </h3>
+
+                </div>
+
+                <div class="space-y-3">
+
+                    {% for topic in module.topics %}
+                    <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-[#daf0ee] transition cursor-pointer">
+
+                        <input
+                            type="checkbox"
+                            name="completed_topics"
+                            value="{{ topic.topic_id }}"
+                            class="h-5 w-5 rounded border-[#9db5b2] text-[#94d1be] focus:ring-[#94d1be]"
+                        >
+
+                        <div class="flex flex-col">
+                            <span class="text-[#3b413c] font-medium">
+                                {{ topic.content }}
+                            </span>
+
+                        </div>
+
+                    </label>
+                    {% endfor %}
+
+                </div>
+            </div>
+            {% endfor %}
+
+        </div>
+
+        <div class="pt-4">
+            <button
+                type="submit"
+                class="bg-[#94d1be] hover:bg-[#7fc5ae] text-[#3b413c] px-8 py-3 rounded-xl font-semibold shadow-md transition"
+            >
+                Recalculate Schedule
+            </button>
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}
