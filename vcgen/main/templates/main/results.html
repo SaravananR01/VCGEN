@@ -32,7 +32,6 @@ Results
             </span>
             <div class="h-[3px] w-32 mt-2 bg-[#94d1be] rounded-full"></div>
         </h3>
-
         {% for mod in modules %}
         <div class="w-full p-6 md:p-8 rounded-2xl shadow-lg border-2 border-[#94d1be] bg-gradient-to-br from-[#bfe3db] to-[#9db5b2] text-[#3b413c] m-3 transition-all duration-300 hover:shadow-xl hover:scale-[1.01]">
             <div class="flex justify-between items-center border-b-2 border-[#94d1be] pb-2 mb-4">
@@ -46,20 +45,34 @@ Results
 
             <ul class="space-y-3">
                 {% for topic in mod.topicslist %}
-                <li class="p-4 bg-white rounded-xl shadow-sm border border-[#94d1be] hover:bg-[#f3faf9] transition-all duration-300">
+                <li class="p-4 rounded-xl shadow-sm border transition-all duration-300
+                    {% if topic.teachertime == 0 and topic.studenttime == 0 %}
+                        bg-[#e8e8e8] border-gray-300 opacity-60
+                    {% else %}
+                        bg-white border-[#94d1be] hover:bg-[#f3faf9]
+                    {% endif %}">
                     <div class="flex flex-col md:flex-row justify-between md:items-center">
                         <div class="flex-1">
-                            <p class="font-semibold text-lg">{{ topic.topic.content }}</p>
-                            <p class="text-sm text-[#3b413c]/70">Skill: 
+                            <p class="font-semibold text-lg flex items-center gap-2">
+                                {% if topic.teachertime == 0 and topic.studenttime == 0 %}
+                                    <span class="text-xs bg-gray-400 text-white px-2 py-0.5 rounded-full">✓ Covered</span>
+                                {% endif %}
+                                {{ topic.topic.content }}
+                            </p>
+                            <p class="text-sm text-[#3b413c]/70">Skill:
                                 <span class="font-medium">{{ topic.topic.mapped_skill }}</span>
                             </p>
                         </div>
                         <div class="mt-2 md:mt-0 text-sm md:text-base text-[#3b413c]/80">
-                            <span class="font-semibold">Teacher:</span> {{ topic.teachertime }} hrs  
-                            <span class="mx-1 text-[#3b413c]/50">|</span>  
-                            <span class="font-semibold">Student:</span> {{ topic.studenttime }} hrs  
-                            <span class="mx-1 text-[#3b413c]/50">=</span>  
-                            <span class="font-bold text-[#2e3430]">{{ topic.time }} hrs</span>
+                            {% if topic.teachertime == 0 and topic.studenttime == 0 %}
+                                <span class="text-gray-500 italic">Completed — hours redistributed</span>
+                            {% else %}
+                                <span class="font-semibold">Teacher:</span> {{ topic.teachertime }} hrs
+                                <span class="mx-1 text-[#3b413c]/50">|</span>
+                                <span class="font-semibold">Student:</span> {{ topic.studenttime }} hrs
+                                <span class="mx-1 text-[#3b413c]/50">=</span>
+                                <span class="font-bold text-[#2e3430]">{{ topic.time }} hrs</span>
+                            {% endif %}
                         </div>
                     </div>
                 </li>

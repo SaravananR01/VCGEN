@@ -1012,36 +1012,94 @@ def closeresponses(request,class_id):
             toclose.accepting_response=False
             toclose.save()
 
-def update_progress(request,class_id):
-    context={}
+def update_progress(request, class_id):
+    context = {}
     if 'user' not in request.session:
         return redirect('login')
     else:
-        context['name']=Teacher.objects.filter(teacher_id=request.session['user'])[0].name
-    ourclass=Course.objects.filter(course_id=class_id)
-    if len(ourclass)<1:
+        context['name'] = Teacher.objects.filter(teacher_id=request.session['user'])[0].name
+
+    ourclass = Course.objects.filter(course_id=class_id)
+    if len(ourclass) < 1:
         return redirect('classes')
-    else:
-        class cusModule:
-            def __init__(self,mod):
-                self.name=mod.name
-                self.hours=mod.hours
-                self.topics=[]
-            
-            def addtopic(self,topic):
-                self.topics.append(topic)
 
-        ourclass=ourclass[0]
-        datamodules=[]
-        modules=Module.objects.filter(course=ourclass)
+    ourclass = ourclass[0]
+    modules = Module.objects.filter(course=ourclass)
+
+    class cusModule:
+        def __init__(self, mod):
+            self.name = mod.name
+            self.hours = mod.hours
+            self.topics = []
+
+        def addtopic(self, topic):
+            self.topics.append(topic)
+
+    datamodules = []
+    for mod in modules:
+        curmod = cusModule(mod)
+        for topic in Topics.objects.filter(module=mod):
+            curmod.addtopic(topic)
+        datamodules.append(curmod)
+
+    context['cid'] = class_id
+    context['cname'] = ourclass.name
+    context['modules'] = datamodules
+
+    if request.method == "POST":
+        total_hours = int(request.POST.get('total_hours', ourclass.hours))
+        completed_hours = int(request.POST.get('completed_hours', 0))
+        completed_topic_ids = set(request.POST.getlist('completed_topics'))
+
+        remaining_hours = max(0, total_hours - completed_hours)
+
+        all_topics = []
         for mod in modules:
-            curmod=cusModule(mod)
             for topic in Topics.objects.filter(module=mod):
-                curmod.addtopic(topic)
-            datamodules.append(curmod)
+                teacher_time = float(topic.teacherweight) * mod.hours * float(ourclass.split)
+                student_time = float(topic.studentweight) * ourclass.hours * (1 - float(ourclass.split))
+                original_time = teacher_time + student_time
+                all_topics.append({
+                    'obj': topic,
+                    'original_time': original_time,
+                    'completed': topic.topic_id in completed_topic_ids,
+                    'mod': mod,
+                })
 
-        context['cid']=class_id
-        context['cname']=ourclass.name
-        context['modules']= datamodules
-        print(context)
-    return render(request,"main/dynamic.html",context=context)
+        completed_hours_locked = sum(t['original_time'] for t in all_topics if t['completed'])
+
+        pending_topics = [t for t in all_topics if not t['completed']]
+        pending_original_total = sum(t['original_time'] for t in pending_topics)
+
+        for t in all_topics:
+            topic_obj = t['obj']
+            mod = t['mod']
+
+            if t['completed']:
+                topic_obj.teacherweight = 0
+                topic_obj.studentweight = 0
+                topic_obj.save()
+            else:
+                if pending_original_total > 0:
+                    proportion = t['original_time'] / pending_original_total
+                    new_total_time = remaining_hours * proportion
+
+                    teacher_fraction = float(ourclass.split)
+                    student_fraction = 1 - teacher_fraction
+
+                    mod_teacher_pool = float(mod.hours) * teacher_fraction
+                    course_student_pool = float(ourclass.hours) * student_fraction
+
+                    new_teacher_time = new_total_time * teacher_fraction
+                    new_student_time = new_total_time * student_fraction
+
+                    topic_obj.teacherweight = round(new_teacher_time / mod_teacher_pool, 6) if mod_teacher_pool > 0 else 0
+                    topic_obj.studentweight = round(new_student_time / course_student_pool, 6) if course_student_pool > 0 else 0
+                    topic_obj.save()
+
+        ourclass.hours = total_hours
+        ourclass.save()
+
+        return redirect(f'/results/{class_id}')
+
+    return render(request, "main/dynamic.html", context=context)
