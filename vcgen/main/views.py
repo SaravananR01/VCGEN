@@ -489,6 +489,8 @@ def joinclass(request):
             context['error']="Invalid code!"
         elif re.match(r'[0-9]{2}[a-zA-Z]{3}[0-9]{4,}',regno)==None:
             context['error']="Invalid Registration Number"
+        elif not reqclass[0].accepting_response:
+            context['error']="Responses Closed"
         else:
             student=Student.objects.create(
                 student_id=gen_student_id(),
@@ -1008,9 +1010,11 @@ def closeresponses(request,class_id):
         return redirect('login')
     else:
         toclose=Course.objects.filter(course_id=class_id)
+        toclose=toclose[0]
         if toclose.accepting_response:
             toclose.accepting_response=False
             toclose.save()
+    return redirect('/classes')
 
 def update_progress(request, class_id):
     context = {}
