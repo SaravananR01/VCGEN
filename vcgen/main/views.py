@@ -12,6 +12,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from io import BytesIO
 from .pdf_parser import parse_syllabus_pdf
+from scipy.optimize import linprog
 
 from dataclasses import dataclass
 from typing import List, Dict, Any
@@ -392,6 +393,118 @@ def map_topics_via_bloom(
 
     return pd.DataFrame(rows)
 
+def compute_lp_student_weights(all_topics, modules_map, skill_demand, course_hours, split):
+    student_pool = float(course_hours) * (1.0 - float(split))
+    n = len(all_topics)
+
+    if n == 0 or student_pool <= 0:
+        return {t.topic_id: 0.0 for t in all_topics}
+
+    topic_demands = []
+    for topic in all_topics:
+        mapped = topic.mapped_skill
+
+        if isinstance(mapped, str):
+            skills = [mapped]
+        elif isinstance(mapped, list):
+            skills = mapped
+        else:
+            skills = []
+
+        try:
+            confidences = topic.skill_confidence if topic.skill_confidence else {}
+        except AttributeError:
+            confidences = {}
+
+        weighted_sum = 0.0
+        weight_total = 0.0
+        for skill in skills:
+            conf = float(confidences.get(skill, 1.0))
+            demand = float(skill_demand.get(skill, 0.0))
+            weighted_sum += demand * conf
+            weight_total += conf
+
+        topic_demand = weighted_sum / weight_total if weight_total > 0 else 0.0
+        topic_demands.append(topic_demand)
+
+    topic_demands = np.array(topic_demands, dtype=float)
+
+    floors = []
+    for topic in all_topics:
+        mod = modules_map[topic.module_id]
+        teacher_w = float(topic.teacherweight)
+        proportional_share = teacher_w * student_pool
+        floor = max(0.05, proportional_share * 0.30)
+        floors.append(floor)
+
+    floors = np.array(floors, dtype=float)
+
+    floor_sum = floors.sum()
+    if floor_sum > student_pool:
+        floors = floors * (student_pool / floor_sum) * 0.95
+
+    c = -topic_demands
+
+    A_eq = np.ones((1, n))
+    b_eq = np.array([student_pool])
+
+    module_ids = list({topic.module_id for topic in all_topics})
+    A_ub_rows = []
+    b_ub_rows = []
+
+    for mid in module_ids:
+        mod = modules_map[mid]
+        mod_topic_indices = [i for i, t in enumerate(all_topics) if t.module_id == mid]
+        if not mod_topic_indices:
+            continue
+        proportional_mod_share = (float(mod.hours) / max(1, sum(
+            modules_map[m].hours for m in module_ids
+        ))) * student_pool
+        cap = proportional_mod_share * 1.5
+
+        row = np.zeros(n)
+        for idx in mod_topic_indices:
+            row[idx] = 1.0
+        A_ub_rows.append(row)
+        b_ub_rows.append(cap)
+
+    A_ub = np.array(A_ub_rows) if A_ub_rows else None
+    b_ub = np.array(b_ub_rows) if b_ub_rows else None
+
+    bounds = [(floors[i], student_pool) for i in range(n)]
+
+    try:
+        result = linprog(
+            c,
+            A_ub=A_ub,
+            b_ub=b_ub,
+            A_eq=A_eq,
+            b_eq=b_eq,
+            bounds=bounds,
+            method='highs'
+        )
+
+        if result.success:
+            allocated_hours = result.x
+        else:
+            print(f"[LP WARNING] {result.message} — falling back to proportional.")
+            total_demand = topic_demands.sum() or 1.0
+            allocated_hours = (topic_demands / total_demand) * student_pool
+            for i in range(n):
+                if allocated_hours[i] < floors[i]:
+                    allocated_hours[i] = floors[i]
+
+    except Exception as e:
+        print(f"[LP ERROR] {e} — falling back to proportional.")
+        total_demand = topic_demands.sum() or 1.0
+        allocated_hours = (topic_demands / total_demand) * student_pool
+
+    weights = {}
+    for i, topic in enumerate(all_topics):
+        weights[topic.topic_id] = float(allocated_hours[i]) / student_pool
+
+    return weights
+
 def gen_teacher_id():
     code="T"+"".join([str(random.randint(1,9)) for x in range(7)])
     while len(Teacher.objects.filter(teacher_id=code))>0:
@@ -525,10 +638,16 @@ def survey(request,class_id):
         context['cid']=class_id
         context['cname']=ourclass.name
         mods=Module.objects.filter(course=ourclass)
-        skills=[]
+        skills = []
         for mod in mods:
-            skills.extend([x.mapped_skill for x in Topics.objects.filter(module=mod) if x.mapped_skill ])
-        skills=list(set(skills))
+            for topic in Topics.objects.filter(module=mod):
+                mapped = topic.mapped_skill
+                if not mapped:
+                    continue
+                if isinstance(mapped, str):
+                    mapped = [mapped]
+                skills.extend(mapped)
+        skills = list(set(skills))
         skills.sort()
         context['skills']=skills
         if request.method=="POST":
@@ -558,25 +677,46 @@ def survey(request,class_id):
                         skillvotes[p]=1
                     totalvotes+=1
 
-            skillweights={a:b/totalvotes for a,b in skillvotes.items()}
-            topicstoskills={}
-            mods=Module.objects.filter(course=ourclass)
+            # skillweights={a:b/totalvotes for a,b in skillvotes.items()}
+            # topicstoskills={}
+            # mods=Module.objects.filter(course=ourclass)
+            # for m in mods:
+            #     for topic in Topics.objects.filter(module=m):
+            #         if topic.mapped_skill not in topicstoskills:
+            #             topicstoskills[topic.mapped_skill]={'count':1,'topics':[topic.content]}
+            #         else:
+            #             topicstoskills[topic.mapped_skill]['count']+=1
+            #             topicstoskills[topic.mapped_skill]['topics'].append(topic.content)
+            # print(skillweights,topicstoskills)
+            # for m in mods:
+            #     for topic in Topics.objects.filter(module=m):
+            #         mappedskill=topic.mapped_skill
+            #         if mappedskill not in skillweights:
+            #             topic.studentweight=0
+            #         else:
+            #             topic.studentweight=skillweights[mappedskill]/topicstoskills[mappedskill]['count']
+            #         topic.save()
+
+            skill_demand = {a: b / totalvotes for a, b in skillvotes.items()}
+            mods = Module.objects.filter(course=ourclass)
+            all_topics = []
+            modules_map = {}
             for m in mods:
+                modules_map[m.module_id] = m
                 for topic in Topics.objects.filter(module=m):
-                    if topic.mapped_skill not in topicstoskills:
-                        topicstoskills[topic.mapped_skill]={'count':1,'topics':[topic.content]}
-                    else:
-                        topicstoskills[topic.mapped_skill]['count']+=1
-                        topicstoskills[topic.mapped_skill]['topics'].append(topic.content)
-            print(skillweights,topicstoskills)
-            for m in mods:
-                for topic in Topics.objects.filter(module=m):
-                    mappedskill=topic.mapped_skill
-                    if mappedskill not in skillweights:
-                        topic.studentweight=0
-                    else:
-                        topic.studentweight=skillweights[mappedskill]/topicstoskills[mappedskill]['count']
-                    topic.save()
+                    all_topics.append(topic)
+
+            lp_weights = compute_lp_student_weights(
+                all_topics=all_topics,
+                modules_map=modules_map,
+                skill_demand=skill_demand,
+                course_hours=ourclass.hours,
+                split=float(ourclass.split),
+            )
+
+            for topic in all_topics:
+                topic.studentweight = lp_weights.get(topic.topic_id, 0.0)
+                topic.save()
 
             return redirect('/thankyou')
     return render(request,"main/survey.html",context=context)
@@ -899,17 +1039,79 @@ def newclass(request):
             subject=request.POST['cname']
             print(subject)
             #fnresult=map_topics_HF_blend(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
-            fnresult=map_topics_via_bloom(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
-            for i,topic in enumerate(topicslist):
-                #mappedval=ensemble_label(topic)['pred']
-                newtopic=Topics.objects.create(
+            # fnresult=map_topics_via_bloom(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
+            # for i,topic in enumerate(topicslist):
+            #     #mappedval=ensemble_label(topic)['pred']
+            #     newtopic=Topics.objects.create(
+            #         topic_id=gen_topic_id(),
+            #         module=newmod,
+            #         content=topic,
+            #         mapped_skill=fnresult[i],
+            #         teacherweight=0,
+            #         studentweight=0,
+            #     )
+            
+            #ALt
+            # bloom_df = map_topics_via_bloom(
+            #     topicslist, subject,
+            #     os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+            # )
+            # for i, topic in enumerate(topicslist):
+            #     row = bloom_df.iloc[i]
+            #     skills = row['skill']         
+            #     confidences = row['confidence']
+
+            #     skill_conf = {}
+            #     bloom_to_skill_map = BLOOM_TO_SKILL
+            #     for bloom_label, score in confidences.items():
+            #         for skill in bloom_to_skill_map.get(bloom_label, []):
+            #             if skill in skills:
+            #                 skill_conf[skill] = max(skill_conf.get(skill, 0.0), score)
+
+            #     newtopic = Topics.objects.create(
+            #         topic_id=gen_topic_id(),
+            #         module=newmod,
+            #         content=topic,
+            #         mapped_skill=skills,       
+            #         teacherweight=0,
+            #         studentweight=0,
+            #     )
+            #     try:
+            #         newtopic.skill_confidence = skill_conf
+            #         newtopic.save()
+            #     except Exception:
+            #         pass 
+
+            #primary
+            hf_df = map_topics_HF_blend(
+                topicslist, subject,
+                os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+            )
+            for i, topic in enumerate(topicslist):
+                row = hf_df.iloc[i]
+
+                skills = row['skill']
+                if isinstance(skills, str):
+                    skills = [skills]
+                elif not isinstance(skills, list):
+                    skills = list(skills)
+
+                confidences = row['confidence'] 
+                skill_conf = {skill: float(confidences.get(skill, 0.0)) for skill in skills}
+
+                newtopic = Topics.objects.create(
                     topic_id=gen_topic_id(),
                     module=newmod,
                     content=topic,
-                    mapped_skill=fnresult[i],
+                    mapped_skill=skills,
                     teacherweight=0,
                     studentweight=0,
                 )
+                try:
+                    newtopic.skill_confidence = skill_conf
+                    newtopic.save()
+                except Exception:
+                    pass
         newcourse.hours=hours
         newcourse.save()
         
@@ -1057,49 +1259,43 @@ def update_progress(request, class_id):
 
         remaining_hours = max(0, total_hours - completed_hours)
 
-        all_topics = []
+        all_topic_objs = []
+        modules_map = {}
         for mod in modules:
+            modules_map[mod.module_id] = mod
             for topic in Topics.objects.filter(module=mod):
-                teacher_time = float(topic.teacherweight) * mod.hours * float(ourclass.split)
-                student_time = float(topic.studentweight) * ourclass.hours * (1 - float(ourclass.split))
-                original_time = teacher_time + student_time
-                all_topics.append({
-                    'obj': topic,
-                    'original_time': original_time,
-                    'completed': topic.topic_id in completed_topic_ids,
-                    'mod': mod,
-                })
+                all_topic_objs.append(topic)
 
-        completed_hours_locked = sum(t['original_time'] for t in all_topics if t['completed'])
+        for topic in all_topic_objs:
+            if topic.topic_id in completed_topic_ids:
+                topic.teacherweight = 0
+                topic.studentweight = 0
+                topic.save()
 
-        pending_topics = [t for t in all_topics if not t['completed']]
-        pending_original_total = sum(t['original_time'] for t in pending_topics)
+        pending_topics = [t for t in all_topic_objs if t.topic_id not in completed_topic_ids]
 
-        for t in all_topics:
-            topic_obj = t['obj']
-            mod = t['mod']
+        students = Student.objects.filter(course=ourclass)
+        skillvotes = {}
+        totalvotes = 0
+        for s in students:
+            for p in s.skillsreq.split(","):
+                p = p.strip()
+                if p:
+                    skillvotes[p] = skillvotes.get(p, 0) + 1
+                    totalvotes += 1
+        skill_demand = {a: b / totalvotes for a, b in skillvotes.items()} if totalvotes else {}
 
-            if t['completed']:
-                topic_obj.teacherweight = 0
-                topic_obj.studentweight = 0
-                topic_obj.save()
-            else:
-                if pending_original_total > 0:
-                    proportion = t['original_time'] / pending_original_total
-                    new_total_time = remaining_hours * proportion
-
-                    teacher_fraction = float(ourclass.split)
-                    student_fraction = 1 - teacher_fraction
-
-                    mod_teacher_pool = float(mod.hours) * teacher_fraction
-                    course_student_pool = float(ourclass.hours) * student_fraction
-
-                    new_teacher_time = new_total_time * teacher_fraction
-                    new_student_time = new_total_time * student_fraction
-
-                    topic_obj.teacherweight = round(new_teacher_time / mod_teacher_pool, 6) if mod_teacher_pool > 0 else 0
-                    topic_obj.studentweight = round(new_student_time / course_student_pool, 6) if course_student_pool > 0 else 0
-                    topic_obj.save()
+        if pending_topics:
+            lp_weights = compute_lp_student_weights(
+                all_topics=pending_topics,
+                modules_map=modules_map,
+                skill_demand=skill_demand,
+                course_hours=remaining_hours, 
+                split=float(ourclass.split),
+            )
+            for topic in pending_topics:
+                topic.studentweight = lp_weights.get(topic.topic_id, 0.0)
+                topic.save()
 
         ourclass.hours = total_hours
         ourclass.save()
