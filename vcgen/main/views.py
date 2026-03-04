@@ -199,6 +199,133 @@ def _fallback_by_repo_only(topic: str, repo_rows: List[Dict]) -> Dict:
             best_row, best_score = r, score
     return best_row or repo_rows[0]
 
+#new code
+_embed_model = None
+_skill_embeddings_cache = {} 
+
+def get_embed_model():
+    global _embed_model
+    if _embed_model is None:
+        _embed_model = SentenceTransformer("all-MiniLM-L6-v2")
+        _embed_model.max_seq_length = 256
+    return _embed_model
+
+def embed_scores_from_descriptions(text: str, repo: list) -> dict:
+    """
+    Compare topic text against full skill descriptions instead of skill name labels.
+    Descriptions are encoded once and cached.
+    """
+    global _skill_embeddings_cache
+    model = get_embed_model()
+
+    topic_vec = model.encode(
+        [text], normalize_embeddings=True, convert_to_numpy=True
+    )
+
+    scores = {}
+    for row in repo:
+        skill = row["skill"]
+        desc  = row.get("embed_description", row["skill"]) 
+
+        if skill not in _skill_embeddings_cache:
+            _skill_embeddings_cache[skill] = model.encode(
+                [desc], normalize_embeddings=True, convert_to_numpy=True
+            )
+
+        desc_vec = _skill_embeddings_cache[skill]
+        cosine   = float((topic_vec @ desc_vec.T).ravel()[0])
+        scores[skill] = (cosine + 1.0) / 2.0  # map to [0, 1]
+
+    return scores
+
+SKILL_HYPOTHESES = {
+    "Conceptual Understanding":
+        "This topic requires understanding definitions, theories, or formal models.",
+    "Problem Solving & Application":
+        "This topic requires applying methods, solving problems, or working through algorithms.",
+    "Communication & Expression":
+        "This topic requires writing, presenting, or communicating ideas to an audience.",
+    "Design & Creation":
+        "This topic requires building, implementing, or designing a system or artifact.",
+    "Research & Inquiry":
+        "This topic requires investigation, comparison, or hypothesis testing.",
+    "Quantitative & Data Skills":
+        "This topic requires numerical computation, data analysis, or statistical reasoning.",
+    "Collaboration & Teamwork":
+        "This topic is primarily learned through group work or team-based activities.",
+}
+
+def zero_shot_scores_with_hypotheses(text: str, repo: list) -> dict:
+    global _zs_pipe
+    if _zs_pipe is None:
+        _zs_pipe = pipeline(
+            "zero-shot-classification",
+            model="facebook/bart-large-mnli",
+            device_map="auto"
+        )
+
+    hypothesis_template = "{}".format  
+    labels     = [r["skill"] for r in repo]
+    hypotheses = [SKILL_HYPOTHESES.get(r["skill"], r["skill"]) for r in repo]
+
+    try:
+        res = _zs_pipe(
+            text,
+            candidate_labels=hypotheses, 
+            multi_label=True
+        )
+        hyp_to_skill = {SKILL_HYPOTHESES.get(r["skill"], r["skill"]): r["skill"] for r in repo}
+        out = {r["skill"]: 0.0 for r in repo}
+        for lab, sc in zip(res["labels"], res["scores"]):
+            skill = hyp_to_skill.get(lab)
+            if skill:
+                out[skill] = float(sc)
+        return out
+    except Exception:
+        u = 1.0 / max(1, len(labels))
+        return {r["skill"]: u for r in repo}
+    
+def map_topics_HF_blend_2(topics,subject_context,csv_path,
+                        top_k=3,
+                        w_zs=0.50, w_emb=0.50, w_kw=0.0
+                        ):
+    repo = load_skill_repo_csv(csv_path)
+
+    rows = []
+    for topic in topics:
+        enriched = f"{subject_context}: {topic}" if subject_context else topic
+
+        zs_scores = zero_shot_scores_with_hypotheses(enriched, repo)
+
+        em_scores = embed_scores_from_descriptions(enriched, repo)
+
+        kw_scores = {r["skill"]: keyword_score(topic, r) for r in repo}
+
+        labels = [r["skill"] for r in repo]
+
+        blended = {
+            lab: w_zs * zs_scores.get(lab, 0.0)
+                + w_emb * em_scores.get(lab, 0.0)
+                + w_kw  * kw_scores.get(lab, 0.0)
+            for lab in labels
+        }
+
+        top_score = max(blended.values())
+        threshold = max(0.20, top_score * 0.80)
+
+        sorted_labels = sorted(labels, key=lambda x: blended[x], reverse=True)
+        chosen = [l for l in sorted_labels if blended[l] >= threshold][:top_k]
+
+        if not chosen:
+            chosen = [sorted_labels[0]]
+
+        rows.append({
+            "topic":      topic,
+            "skill":      chosen,
+            "confidence": {l: round(blended[l], 4) for l in chosen}
+        })
+
+    return pd.DataFrame(rows)
 # 6) Main HF-blended mapper (uses your CSV loader)
 # def map_topics_HF_blend(topics: List[str],
 #                         csv_path: str,
@@ -1083,7 +1210,7 @@ def newclass(request):
             #         pass 
 
             #primary
-            hf_df = map_topics_HF_blend(
+            hf_df = map_topics_HF_blend_2(
                 topicslist, subject,
                 os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
             )

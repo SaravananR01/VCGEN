@@ -1,6 +1,6 @@
-skill,keywords,regex_cues,student_title,student_desc
-Conceptual Understanding,"define,explain,describe,concept,theory,principle","\\b(explain|define|describe)\\b","Conceptual Understanding","Understanding core principles and ideas"
-Analytical Thinking,"analyze,compare,evaluate,interpret,critique,assess","\\b(compare|evaluate|analyze)\\b","Analytical Thinking","Breaking down and evaluating information"
+skill,keywords,regex_cues,student_title,student_desc,embed_description
+Conceptual Understanding,"define,explain,describe,concept,theory,principle","\\b(explain|define|describe)\\b","Conceptual Understanding","Understanding core principles and ideas","Learning definitions, understanding how systems and models work, grasping theories and formal structures, studying what something is and why it behaves the way it does. Topics like automata theory, data structures, laws of thermodynamics, and historical events all build this skill."
+Analytical Thinking,"analyze,compare,evaluate,interpret,critique,assess","\\b(compare|evaluate|analyze)\\b","Analytical Thinking","Breaking down and evaluating information",""
 Problem Solving & Application,"solve,apply,implement,design,calculate,derive","\\b(solve|design|implement)\\b","Problem Solving","Applying knowledge to solve problems"
 Quantitative & Data Skills,"data,statistics,graph,table,measure,probability","\\b(mean|variance|probability|graph)\\b","Data Skills","Working with numbers and structured data"
 Design & Creation,"develop,create,construct,model,build,formulate","\\b(build|construct|model)\\b","Creation","Producing structured outputs"
