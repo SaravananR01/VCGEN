@@ -524,7 +524,7 @@ def compute_lp_student_weights(all_topics, modules_map, skill_demand, course_hou
     student_pool = float(course_hours) * (1.0 - float(split))
     n = len(all_topics)
 
-    if n == 0 or student_pool <= 0:
+    if n == 0: # removed : or student_pool <=0 criteria
         return {t.topic_id: 0.0 for t in all_topics}
 
     topic_demands = []
