@@ -1,5 +1,5 @@
 from django.shortcuts import render,redirect
-
+from django.conf import settings
 from .models import Teacher,Course,Module,Topics,Student
 import random,re,os
 import pandas as pd
@@ -13,10 +13,34 @@ from reportlab.lib.pagesizes import A4
 from io import BytesIO
 from .pdf_parser import parse_syllabus_pdf
 from scipy.optimize import linprog
+from google import genai
+from google.genai import types
+import json, os, re
 
 from dataclasses import dataclass
 from typing import List, Dict, Any
 import json
+
+_gemini_client = None
+
+def get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key="")
+    return _gemini_client
+
+
+def build_skill_definitions(repo: list) -> str:
+    """
+    Builds the skill definitions block from the skill repo CSV rows.
+    Uses embed_description if available, falls back to student_desc.
+    """
+    lines = []
+    for i, row in enumerate(repo, 1):
+        skill = row["skill"]
+        desc  = row.get("embed_description", "") or row.get("student_desc", "") or skill
+        lines.append(f"{i}. {skill}\n   {desc}")
+    return "\n\n".join(lines)
 
 @dataclass
 class ScoreDict:
@@ -47,15 +71,15 @@ def _prefix_regex(items):
 
 def load_skill_repo_csv(csv_path):
     df = pd.read_csv(csv_path)
-
-    repo=[]
-    for _,r in df.iterrows():
+    repo = []
+    for _, r in df.iterrows():
         repo.append({
-            "skill": r["skill"],
-            "pos": _as_list(r.get("keywords","")),
-            "proto": _prefix_regex(_as_list(r.get("regex_cues",""))),
-            "student_title": r.get("student_title",""),
-            "student_desc": r.get("student_desc",""),
+            "skill":             r["skill"],
+            "pos":               _as_list(r.get("keywords", "")),
+            "proto":             _prefix_regex(_as_list(r.get("regex_cues", ""))),
+            "student_title":     r.get("student_title", ""),
+            "student_desc":      r.get("student_desc", ""),
+            "embed_description": r.get("embed_description", ""), 
         })
     return repo
 
@@ -264,17 +288,24 @@ def zero_shot_scores_with_hypotheses(text: str, repo: list) -> dict:
             device_map="auto"
         )
 
-    hypothesis_template = "{}".format  
     labels     = [r["skill"] for r in repo]
-    hypotheses = [SKILL_HYPOTHESES.get(r["skill"], r["skill"]) for r in repo]
+
+    hypotheses = [
+        r.get("embed_description", r["skill"]) or r["skill"]
+        for r in repo
+    ]
 
     try:
         res = _zs_pipe(
             text,
-            candidate_labels=hypotheses, 
+            candidate_labels=hypotheses,
             multi_label=True
         )
-        hyp_to_skill = {SKILL_HYPOTHESES.get(r["skill"], r["skill"]): r["skill"] for r in repo}
+
+        hyp_to_skill = {
+            r.get("embed_description", r["skill"]) or r["skill"]: r["skill"]
+            for r in repo
+        }
         out = {r["skill"]: 0.0 for r in repo}
         for lab, sc in zip(res["labels"], res["scores"]):
             skill = hyp_to_skill.get(lab)
@@ -324,6 +355,7 @@ def map_topics_HF_blend_2(topics,subject_context,csv_path,
             "skill":      chosen,
             "confidence": {l: round(blended[l], 4) for l in chosen}
         })
+        print(pd.DataFrame(rows))
 
     return pd.DataFrame(rows)
 # 6) Main HF-blended mapper (uses your CSV loader)
@@ -520,17 +552,116 @@ def map_topics_via_bloom(
 
     return pd.DataFrame(rows)
 
+def map_all_topics_with_gemini(
+    modules_data: list[dict],   
+    subject_context: str,
+    csv_path: str,
+) -> dict[str, dict]:
+    """
+    Makes a single Gemini API call for the entire syllabus.
+
+    Returns a flat lookup dict keyed by topic string:
+        {
+            "Finite Automata": {"skill": ["Conceptual Understanding"], "confidence": {"Conceptual Understanding": 0.9}},
+            "DFA Minimization": {"skill": ["Problem Solving & Application"], "confidence": {...}},
+            ...
+        }
+    """
+    repo   = load_skill_repo_csv(csv_path)
+    client = get_gemini_client()
+    valid_skills = [r["skill"] for r in repo]
+
+    skill_block = "\n\n".join(
+        f"{i}. {r['skill']}\n   {r.get('embed_description', '') or r.get('student_desc', '')}"
+        for i, r in enumerate(repo, 1)
+    )
+
+    syllabus_block = ""
+    for mod in modules_data:
+        syllabus_block += f"\nModule: {mod['module_name']}\n"
+        for topic in mod["topics"]:
+            syllabus_block += f"  - {topic}\n"
+
+    prompt = f"""You are a curriculum analyst. Map every topic in the syllabus below to the academic skills it develops.
+
+COURSE: {subject_context}
+
+AVAILABLE SKILLS (use ONLY these exact names):
+{skill_block}
+
+SYLLABUS:
+{syllabus_block}
+
+INSTRUCTIONS:
+- For each topic, assign 1 to 3 skills that a student genuinely develops by studying it.
+- Think about what a student DOES: recall definitions, apply a procedure, build something, analyze trade-offs, work with data, write a report, or investigate a question.
+- Do NOT assign Communication & Expression unless the topic explicitly requires writing a report, essay, or giving a presentation.
+- Do NOT assign Research & Inquiry unless the topic explicitly involves forming hypotheses or conducting experiments.
+- Use the module name as context to disambiguate ambiguous topic names (e.g. "Strings" in a Theory of Computation module means formal language strings, not communication).
+- Return ONLY a valid JSON object with no explanation or markdown fences.
+
+Output format:
+{{
+  "mappings": [
+    {{
+      "topic": "<exact topic name as given>",
+      "skills": ["Skill Name 1", "Skill Name 2"],
+      "confidence": {{"Skill Name 1": 0.9, "Skill Name 2": 0.7}}
+    }},
+    ...
+  ]
+}}
+
+Every topic in the syllabus must appear exactly once in the mappings list."""
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.1,
+                max_output_tokens=4096,
+            )
+        )
+        raw = response.text.strip()
+        raw = re.sub(r"^```json\s*", "", raw)
+        raw = re.sub(r"\s*```$",     "", raw)
+
+        parsed   = json.loads(raw)
+        mappings = parsed.get("mappings", [])
+
+        result = {}
+        for entry in mappings:
+            topic  = entry.get("topic", "")
+            skills = [s for s in entry.get("skills", []) if s in valid_skills]
+            conf   = {k: v for k, v in entry.get("confidence", {}).items() if k in valid_skills}
+            if not skills:
+                skills = [valid_skills[0]]
+            result[topic] = {"skill": skills, "confidence": conf}
+
+        return result
+
+    except Exception as e:
+        print(f"[Gemini BATCH ERROR] {e}")
+        result = {}
+        for mod in modules_data:
+            for topic in mod["topics"]:
+                kw_scores = {r["skill"]: keyword_score(topic, r) for r in repo}
+                best      = max(kw_scores, key=kw_scores.get)
+                result[topic] = {"skill": [best], "confidence": {best: 0.5}}
+        return result
+
+
 def compute_lp_student_weights(all_topics, modules_map, skill_demand, course_hours, split):
     student_pool = float(course_hours) * (1.0 - float(split))
     n = len(all_topics)
 
-    if n == 0: # removed : or student_pool <=0 criteria
+    if n == 0 or not skill_demand or student_pool <= 0:
         return {t.topic_id: 0.0 for t in all_topics}
 
     topic_demands = []
     for topic in all_topics:
         mapped = topic.mapped_skill
-
         if isinstance(mapped, str):
             skills = [mapped]
         elif isinstance(mapped, list):
@@ -556,12 +687,16 @@ def compute_lp_student_weights(all_topics, modules_map, skill_demand, course_hou
 
     topic_demands = np.array(topic_demands, dtype=float)
 
+    if topic_demands.sum() == 0:
+        uniform_w = 1.0 / n
+        return {t.topic_id: uniform_w for t in all_topics}
+
     floors = []
     for topic in all_topics:
         mod = modules_map[topic.module_id]
         teacher_w = float(topic.teacherweight)
         proportional_share = teacher_w * student_pool
-        floor = max(0.05, proportional_share * 0.30)
+        floor = proportional_share * 0.30 if teacher_w > 0 else 0.0
         floors.append(floor)
 
     floors = np.array(floors, dtype=float)
@@ -1107,7 +1242,6 @@ def newclass(request):
             print(i)
         print("Length of PDF: ",len(parsed_modules))
         return render(request,"main/newclass.html",context)
-    
     if request.method=='POST':
         faculty=Teacher.objects.filter(teacher_id=request.session['user'])[0]
         newcourse=Course.objects.create(
@@ -1165,6 +1299,89 @@ def newclass(request):
             topicslist =re.split(pattern, text)'''
             subject=request.POST['cname']
             print(subject)
+    # if request.method == 'POST':
+    #     faculty   = Teacher.objects.filter(teacher_id=request.session['user'])[0]
+    #     newcourse = Course.objects.create(
+    #         course_id=gen_course_id(),
+    #         teacher=faculty,
+    #         name=request.POST['cname'],
+    #         hours=0,
+    #         split=0,
+    #     )
+
+    #     hours       = 0
+    #     modules_data = []  
+
+    #     for i in range(1, 8):
+    #         modname   = request.POST[f'module_name{i}']
+    #         modhours  = request.POST[f'module_hrs{i}']
+    #         modtopics = request.POST[f'topic{i}']
+    #         hours    += int(modhours)
+
+    #         newmod = Module.objects.create(
+    #             module_id=gen_module_id(),
+    #             course=newcourse,
+    #             hours=modhours,
+    #             name=modname
+    #         )
+
+    #         # existing topic parsing logic — unchanged
+    #         text = modtopics.replace("\n", " ")
+    #         text = text.replace(", and", ", ")
+    #         text = text.replace(" - ", "$$$").replace(" – ", "$$$")
+    #         text = text.replace("- ", "$$$").replace(" -", "$$$")
+    #         brackettrue = False
+    #         op = ""
+    #         for x in text:
+    #             if x == "," and not brackettrue:
+    #                 op += "$$$"
+    #             else:
+    #                 op += x
+    #             if x == "(":
+    #                 brackettrue = True
+    #             elif x == ")":
+    #                 brackettrue = False
+    #         topicslist = [t.strip() for t in op.split("$$$") if t.strip()]
+    #         final_topics = []
+    #         for topic in topicslist:
+    #             topic = topic.strip()
+    #             if not topic:
+    #                 continue
+    #             if topic[0].isupper() or not final_topics:
+    #                 final_topics.append(topic)
+    #             else:
+    #                 final_topics[-1] += ", " + topic
+
+    #         modules_data.append({
+    #             "module_name": modname,
+    #             "topics":      final_topics,
+    #             "mod_obj":     newmod,      
+    #         })
+
+    #     subject    = request.POST['cname']
+    #     csv_path   = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+    #     topic_map  = map_all_topics_with_gemini(modules_data, subject, csv_path)
+
+    #     for mod_data in modules_data:
+    #         for topic in mod_data["topics"]:
+    #             mapping    = topic_map.get(topic, {"skill": ["Conceptual Understanding"], "confidence": {}})
+    #             skills     = mapping["skill"]
+    #             skill_conf = mapping["confidence"]
+
+    #             newtopic = Topics.objects.create(
+    #                 topic_id=gen_topic_id(),
+    #                 module=mod_data["mod_obj"],
+    #                 content=topic,
+    #                 mapped_skill=skills,
+    #                 teacherweight=0,
+    #                 studentweight=0,
+    #             )
+    #             newtopic.skill_confidence = skill_conf
+    #             newtopic.save()
+
+    #     newcourse.hours = hours
+    #     newcourse.save()
+    #     return redirect(f'/settings/{newcourse.course_id}')
             #fnresult=map_topics_HF_blend(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
             # fnresult=map_topics_via_bloom(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
             # for i,topic in enumerate(topicslist):
@@ -1412,16 +1629,20 @@ def update_progress(request, class_id):
                     totalvotes += 1
         skill_demand = {a: b / totalvotes for a, b in skillvotes.items()} if totalvotes else {}
 
-        if pending_topics:
+        if pending_topics and skill_demand: 
             lp_weights = compute_lp_student_weights(
                 all_topics=pending_topics,
                 modules_map=modules_map,
                 skill_demand=skill_demand,
-                course_hours=remaining_hours, 
+                course_hours=remaining_hours,
                 split=float(ourclass.split),
             )
             for topic in pending_topics:
                 topic.studentweight = lp_weights.get(topic.topic_id, 0.0)
+                topic.save()
+        elif pending_topics:
+            for topic in pending_topics:
+                topic.studentweight = 0.0
                 topic.save()
 
         ourclass.hours = total_hours
