@@ -14,33 +14,32 @@ from io import BytesIO
 from .pdf_parser import parse_syllabus_pdf
 from scipy.optimize import linprog
 from google import genai
-from google.genai import types
+from groq import Groq
+from dotenv import load_dotenv
 import json, os, re
 
 from dataclasses import dataclass
 from typing import List, Dict, Any
 import json
 
-_gemini_client = None
+load_dotenv()
 
-def get_gemini_client():
-    global _gemini_client
-    if _gemini_client is None:
-        _gemini_client = genai.Client(api_key="")
-    return _gemini_client
+_groq_client = None
 
+def get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+    return _groq_client
 
-def build_skill_definitions(repo: list) -> str:
-    """
-    Builds the skill definitions block from the skill repo CSV rows.
-    Uses embed_description if available, falls back to student_desc.
-    """
+def build_skill_block_for_prompt(repo: list) -> str:
     lines = []
-    for i, row in enumerate(repo, 1):
-        skill = row["skill"]
-        desc  = row.get("embed_description", "") or row.get("student_desc", "") or skill
-        lines.append(f"{i}. {skill}\n   {desc}")
-    return "\n\n".join(lines)
+    for i, r in enumerate(repo, 1):
+        skill = r["skill"]
+        desc  = r.get("embed_description", "") or r.get("student_desc", "") or skill
+        first_sentence = desc.split(".")[0].strip() + "."
+        lines.append(f"{i}. {skill}: {first_sentence}")
+    return "\n".join(lines)
 
 @dataclass
 class ScoreDict:
@@ -552,104 +551,131 @@ def map_topics_via_bloom(
 
     return pd.DataFrame(rows)
 
-def map_all_topics_with_gemini(
-    modules_data: list[dict],   
+import time
+
+def map_all_topics_with_groq(
+    modules_data: list[dict],
     subject_context: str,
     csv_path: str,
+    batch_size: int = 6,        
 ) -> dict[str, dict]:
-    """
-    Makes a single Gemini API call for the entire syllabus.
 
-    Returns a flat lookup dict keyed by topic string:
-        {
-            "Finite Automata": {"skill": ["Conceptual Understanding"], "confidence": {"Conceptual Understanding": 0.9}},
-            "DFA Minimization": {"skill": ["Problem Solving & Application"], "confidence": {...}},
-            ...
-        }
-    """
-    repo   = load_skill_repo_csv(csv_path)
-    client = get_gemini_client()
+    repo         = load_skill_repo_csv(csv_path)
+    client       = get_groq_client()
     valid_skills = [r["skill"] for r in repo]
 
-    skill_block = "\n\n".join(
-        f"{i}. {r['skill']}\n   {r.get('embed_description', '') or r.get('student_desc', '')}"
+    skill_block = "\n".join(
+        f"{i}. {r['skill']}: {(r.get('embed_description','') or r.get('student_desc','')).split('.')[0]}."
         for i, r in enumerate(repo, 1)
     )
 
-    syllabus_block = ""
+    all_topics_flat = []
     for mod in modules_data:
-        syllabus_block += f"\nModule: {mod['module_name']}\n"
         for topic in mod["topics"]:
-            syllabus_block += f"  - {topic}\n"
+            all_topics_flat.append((mod["module_name"], topic))
 
-    prompt = f"""You are a curriculum analyst. Map every topic in the syllabus below to the academic skills it develops.
+    batches = [
+        all_topics_flat[i:i + batch_size]
+        for i in range(0, len(all_topics_flat), batch_size)
+    ]
+
+    result = {}
+
+    for batch_num, batch in enumerate(batches):
+        syllabus_block = "\n".join(
+            f"  - [{mod}] {topic}" for mod, topic in batch
+        )
+
+        prompt = f"""Map each course topic to 1-3 academic skills from the list below.
 
 COURSE: {subject_context}
 
-AVAILABLE SKILLS (use ONLY these exact names):
+SKILLS (use exact names only):
 {skill_block}
 
-SYLLABUS:
+TOPICS ([Module] Topic):
 {syllabus_block}
 
-INSTRUCTIONS:
-- For each topic, assign 1 to 3 skills that a student genuinely develops by studying it.
-- Think about what a student DOES: recall definitions, apply a procedure, build something, analyze trade-offs, work with data, write a report, or investigate a question.
-- Do NOT assign Communication & Expression unless the topic explicitly requires writing a report, essay, or giving a presentation.
-- Do NOT assign Research & Inquiry unless the topic explicitly involves forming hypotheses or conducting experiments.
-- Use the module name as context to disambiguate ambiguous topic names (e.g. "Strings" in a Theory of Computation module means formal language strings, not communication).
-- Return ONLY a valid JSON object with no explanation or markdown fences.
+Return JSON only:
+{{"mappings": [{{"topic": "<exact topic name>", "skills": ["Skill 1"], "confidence": {{"Skill 1": 0.9}}}}]}}
 
-Output format:
-{{
-  "mappings": [
-    {{
-      "topic": "<exact topic name as given>",
-      "skills": ["Skill Name 1", "Skill Name 2"],
-      "confidence": {{"Skill Name 1": 0.9, "Skill Name 2": 0.7}}
-    }},
-    ...
-  ]
-}}
+Rules:
+- Use only skill names from the list above, copied exactly.
+- 1 to 3 skills per topic.
+- Every topic must appear once."""
 
-Every topic in the syllabus must appear exactly once in the mappings list."""
+        raw = ""
+        for attempt in range(3):
+            try:
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are a curriculum analyst. Return valid JSON only. No markdown, no explanation."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=0.1,
+                    max_tokens=1024,
+                    response_format={"type": "json_object"},
+                )
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.1,
-                max_output_tokens=4096,
-            )
-        )
-        raw = response.text.strip()
-        raw = re.sub(r"^```json\s*", "", raw)
-        raw = re.sub(r"\s*```$",     "", raw)
+                finish_reason = response.choices[0].finish_reason
+                raw           = response.choices[0].message.content.strip()
 
-        parsed   = json.loads(raw)
-        mappings = parsed.get("mappings", [])
+                print(f"[Groq] batch={batch_num+1}/{len(batches)} "
+                      f"attempt={attempt+1} "
+                      f"finish_reason={finish_reason} "
+                      f"response_len={len(raw)}")
 
-        result = {}
-        for entry in mappings:
-            topic  = entry.get("topic", "")
-            skills = [s for s in entry.get("skills", []) if s in valid_skills]
-            conf   = {k: v for k, v in entry.get("confidence", {}).items() if k in valid_skills}
-            if not skills:
-                skills = [valid_skills[0]]
-            result[topic] = {"skill": skills, "confidence": conf}
+                if finish_reason == "length":
+                    print(f"[Groq] WARNING: batch {batch_num+1} truncated.")
 
-        return result
+                break 
 
-    except Exception as e:
-        print(f"[Gemini BATCH ERROR] {e}")
-        result = {}
-        for mod in modules_data:
-            for topic in mod["topics"]:
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "rate_limit" in err.lower():
+                    wait = 60 if attempt == 0 else 120
+                    print(f"[Groq] Rate limit hit. Waiting {wait}s before retry...")
+                    time.sleep(wait)
+                else:
+                    print(f"[Groq ERROR] batch={batch_num+1} attempt={attempt+1}: {e}")
+                    break
+
+        try:
+            parsed   = json.loads(raw)
+            mappings = parsed.get("mappings", [])
+
+            for entry in mappings:
+                topic  = entry.get("topic", "")
+                skills = [s for s in entry.get("skills", []) if s in valid_skills]
+                conf   = {k: v for k, v in entry.get("confidence", {}).items()
+                          if k in valid_skills}
+
+                if not skills:
+                    print(f"[Groq VALIDATION FAIL] topic='{topic}' "
+                          f"got unknown skills: {entry.get('skills', [])}")
+                    skills = [valid_skills[0]]
+
+                result[topic] = {"skill": skills, "confidence": conf}
+
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"[Groq JSON ERROR] batch={batch_num+1}: {e}")
+            print(f"[Groq] raw was: {raw[:300]}")
+            for _, topic in batch:
                 kw_scores = {r["skill"]: keyword_score(topic, r) for r in repo}
                 best      = max(kw_scores, key=kw_scores.get)
                 result[topic] = {"skill": [best], "confidence": {best: 0.5}}
-        return result
+
+        if batch_num < len(batches) - 1:
+            time.sleep(15)
+
+    return result
 
 
 def compute_lp_student_weights(all_topics, modules_map, skill_demand, course_hours, split):
@@ -1242,224 +1268,223 @@ def newclass(request):
             print(i)
         print("Length of PDF: ",len(parsed_modules))
         return render(request,"main/newclass.html",context)
-    if request.method=='POST':
-        faculty=Teacher.objects.filter(teacher_id=request.session['user'])[0]
-        newcourse=Course.objects.create(
-            course_id=gen_course_id(),
-            teacher=faculty,
-            name=request.POST['cname'],
-            hours=0,
-            split=0,
-        )
-        hours=0
-        for i in range(1,8):
-            modname=request.POST[f'module_name{i}']
-            modhours=request.POST[f'module_hrs{i}']
-            modtopics=request.POST[f'topic{i}']
-            hours+=int(modhours)
-            newmod=Module.objects.create(
-                module_id=gen_module_id(),
-                course=newcourse,
-                hours=modhours,
-                name=modname
-            )
-            text=modtopics.replace("\n"," ")
-            text=text.replace(", and",", ")
-            text=text.replace(" - ","$$$")
-            text=text.replace(" – ","$$$")
-            text=text.replace("- ","$$$")
-            text=text.replace(" -","$$$")
-            brackettrue=False
-            op=""
-            for x in text:
-                if x=="," and not brackettrue:
-                    op+="$$$"
-                else:
-                    op+=x
-                
-                if x=="(":
-                    brackettrue=True
-                elif x==")":
-                    brackettrue=False
-            text=op
-            topicslist=text.split("$$$")
-            op=[]
-            for topic in topicslist:
-                topic=topic.strip(" ")
-                if topic[0].isupper()  or not op:
-                    op.append(topic)
-                else:
-                    temp=op.pop()
-                    op.append(temp+", "+topic)
-            topicslist=op
-            '''
-            text=modtopics.replace("\n"," ")
-            text=text.replace(", and",", ")
-            pattern=r' - | – |,'
-            topicslist =re.split(pattern, text)'''
-            subject=request.POST['cname']
-            print(subject)
-    # if request.method == 'POST':
-    #     faculty   = Teacher.objects.filter(teacher_id=request.session['user'])[0]
-    #     newcourse = Course.objects.create(
+    # if request.method=='POST':
+    #     faculty=Teacher.objects.filter(teacher_id=request.session['user'])[0]
+    #     newcourse=Course.objects.create(
     #         course_id=gen_course_id(),
     #         teacher=faculty,
     #         name=request.POST['cname'],
     #         hours=0,
     #         split=0,
     #     )
-
-    #     hours       = 0
-    #     modules_data = []  
-
-    #     for i in range(1, 8):
-    #         modname   = request.POST[f'module_name{i}']
-    #         modhours  = request.POST[f'module_hrs{i}']
-    #         modtopics = request.POST[f'topic{i}']
-    #         hours    += int(modhours)
-
-    #         newmod = Module.objects.create(
+    #     hours=0
+    #     for i in range(1,8):
+    #         modname=request.POST[f'module_name{i}']
+    #         modhours=request.POST[f'module_hrs{i}']
+    #         modtopics=request.POST[f'topic{i}']
+    #         hours+=int(modhours)
+    #         newmod=Module.objects.create(
     #             module_id=gen_module_id(),
     #             course=newcourse,
     #             hours=modhours,
     #             name=modname
     #         )
-
-    #         # existing topic parsing logic — unchanged
-    #         text = modtopics.replace("\n", " ")
-    #         text = text.replace(", and", ", ")
-    #         text = text.replace(" - ", "$$$").replace(" – ", "$$$")
-    #         text = text.replace("- ", "$$$").replace(" -", "$$$")
-    #         brackettrue = False
-    #         op = ""
+    #         text=modtopics.replace("\n"," ")
+    #         text=text.replace(", and",", ")
+    #         text=text.replace(" - ","$$$")
+    #         text=text.replace(" – ","$$$")
+    #         text=text.replace("- ","$$$")
+    #         text=text.replace(" -","$$$")
+    #         brackettrue=False
+    #         op=""
     #         for x in text:
-    #             if x == "," and not brackettrue:
-    #                 op += "$$$"
+    #             if x=="," and not brackettrue:
+    #                 op+="$$$"
     #             else:
-    #                 op += x
-    #             if x == "(":
-    #                 brackettrue = True
-    #             elif x == ")":
-    #                 brackettrue = False
-    #         topicslist = [t.strip() for t in op.split("$$$") if t.strip()]
-    #         final_topics = []
+    #                 op+=x
+                
+    #             if x=="(":
+    #                 brackettrue=True
+    #             elif x==")":
+    #                 brackettrue=False
+    #         text=op
+    #         topicslist=text.split("$$$")
+    #         op=[]
     #         for topic in topicslist:
-    #             topic = topic.strip()
-    #             if not topic:
-    #                 continue
-    #             if topic[0].isupper() or not final_topics:
-    #                 final_topics.append(topic)
+    #             topic=topic.strip(" ")
+    #             if topic[0].isupper()  or not op:
+    #                 op.append(topic)
     #             else:
-    #                 final_topics[-1] += ", " + topic
+    #                 temp=op.pop()
+    #                 op.append(temp+", "+topic)
+    #         topicslist=op
+    #         '''
+    #         text=modtopics.replace("\n"," ")
+    #         text=text.replace(", and",", ")
+    #         pattern=r' - | – |,'
+    #         topicslist =re.split(pattern, text)'''
+    #         subject=request.POST['cname']
+    #         print(subject)
+    if request.method == 'POST':
+        faculty   = Teacher.objects.filter(teacher_id=request.session['user'])[0]
+        newcourse = Course.objects.create(
+            course_id=gen_course_id(),
+            teacher=faculty,
+            name=request.POST['cname'],
+            hours=0,
+            split=0,
+        )
 
-    #         modules_data.append({
-    #             "module_name": modname,
-    #             "topics":      final_topics,
-    #             "mod_obj":     newmod,      
-    #         })
+        hours       = 0
+        modules_data = []  
 
-    #     subject    = request.POST['cname']
-    #     csv_path   = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
-    #     topic_map  = map_all_topics_with_gemini(modules_data, subject, csv_path)
+        for i in range(1, 8):
+            modname   = request.POST[f'module_name{i}']
+            modhours  = request.POST[f'module_hrs{i}']
+            modtopics = request.POST[f'topic{i}']
+            hours    += int(modhours)
 
-    #     for mod_data in modules_data:
-    #         for topic in mod_data["topics"]:
-    #             mapping    = topic_map.get(topic, {"skill": ["Conceptual Understanding"], "confidence": {}})
-    #             skills     = mapping["skill"]
-    #             skill_conf = mapping["confidence"]
-
-    #             newtopic = Topics.objects.create(
-    #                 topic_id=gen_topic_id(),
-    #                 module=mod_data["mod_obj"],
-    #                 content=topic,
-    #                 mapped_skill=skills,
-    #                 teacherweight=0,
-    #                 studentweight=0,
-    #             )
-    #             newtopic.skill_confidence = skill_conf
-    #             newtopic.save()
-
-    #     newcourse.hours = hours
-    #     newcourse.save()
-    #     return redirect(f'/settings/{newcourse.course_id}')
-            #fnresult=map_topics_HF_blend(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
-            # fnresult=map_topics_via_bloom(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
-            # for i,topic in enumerate(topicslist):
-            #     #mappedval=ensemble_label(topic)['pred']
-            #     newtopic=Topics.objects.create(
-            #         topic_id=gen_topic_id(),
-            #         module=newmod,
-            #         content=topic,
-            #         mapped_skill=fnresult[i],
-            #         teacherweight=0,
-            #         studentweight=0,
-            #     )
-            
-            #ALt
-            # bloom_df = map_topics_via_bloom(
-            #     topicslist, subject,
-            #     os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
-            # )
-            # for i, topic in enumerate(topicslist):
-            #     row = bloom_df.iloc[i]
-            #     skills = row['skill']         
-            #     confidences = row['confidence']
-
-            #     skill_conf = {}
-            #     bloom_to_skill_map = BLOOM_TO_SKILL
-            #     for bloom_label, score in confidences.items():
-            #         for skill in bloom_to_skill_map.get(bloom_label, []):
-            #             if skill in skills:
-            #                 skill_conf[skill] = max(skill_conf.get(skill, 0.0), score)
-
-            #     newtopic = Topics.objects.create(
-            #         topic_id=gen_topic_id(),
-            #         module=newmod,
-            #         content=topic,
-            #         mapped_skill=skills,       
-            #         teacherweight=0,
-            #         studentweight=0,
-            #     )
-            #     try:
-            #         newtopic.skill_confidence = skill_conf
-            #         newtopic.save()
-            #     except Exception:
-            #         pass 
-
-            #primary
-            hf_df = map_topics_HF_blend_2(
-                topicslist, subject,
-                os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+            newmod = Module.objects.create(
+                module_id=gen_module_id(),
+                course=newcourse,
+                hours=modhours,
+                name=modname
             )
-            for i, topic in enumerate(topicslist):
-                row = hf_df.iloc[i]
 
-                skills = row['skill']
-                if isinstance(skills, str):
-                    skills = [skills]
-                elif not isinstance(skills, list):
-                    skills = list(skills)
+            text = modtopics.replace("\n", " ")
+            text = text.replace(", and", ", ")
+            text = text.replace(" - ", "$$$").replace(" – ", "$$$")
+            text = text.replace("- ", "$$$").replace(" -", "$$$")
+            brackettrue = False
+            op = ""
+            for x in text:
+                if x == "," and not brackettrue:
+                    op += "$$$"
+                else:
+                    op += x
+                if x == "(":
+                    brackettrue = True
+                elif x == ")":
+                    brackettrue = False
+            topicslist = [t.strip() for t in op.split("$$$") if t.strip()]
+            final_topics = []
+            for topic in topicslist:
+                topic = topic.strip()
+                if not topic:
+                    continue
+                if topic[0].isupper() or not final_topics:
+                    final_topics.append(topic)
+                else:
+                    final_topics[-1] += ", " + topic
 
-                confidences = row['confidence'] 
-                skill_conf = {skill: float(confidences.get(skill, 0.0)) for skill in skills}
+            modules_data.append({
+                "module_name": modname,
+                "topics":      final_topics,
+                "mod_obj":     newmod,      
+            })
+
+        subject    = request.POST['cname']
+        csv_path   = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+        topic_map = map_all_topics_with_groq(modules_data, subject, csv_path)
+        print(topic_map)
+        for mod_data in modules_data:
+            for topic in mod_data["topics"]:
+                mapping    = topic_map.get(topic, {"skill": ["Conceptual Understanding"], "confidence": {}})
+                skills     = mapping["skill"]
+                skill_conf = mapping["confidence"]
 
                 newtopic = Topics.objects.create(
                     topic_id=gen_topic_id(),
-                    module=newmod,
+                    module=mod_data["mod_obj"],
                     content=topic,
                     mapped_skill=skills,
                     teacherweight=0,
                     studentweight=0,
                 )
-                try:
-                    newtopic.skill_confidence = skill_conf
-                    newtopic.save()
-                except Exception:
-                    pass
-        newcourse.hours=hours
+                newtopic.skill_confidence = skill_conf
+                newtopic.save()
+
+        newcourse.hours = hours
         newcourse.save()
-        
         return redirect(f'/settings/{newcourse.course_id}')
+        #     fnresult=map_topics_HF_blend(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
+        #     fnresult=map_topics_via_bloom(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
+        #     for i,topic in enumerate(topicslist):
+        #         #mappedval=ensemble_label(topic)['pred']
+        #         newtopic=Topics.objects.create(
+        #             topic_id=gen_topic_id(),
+        #             module=newmod,
+        #             content=topic,
+        #             mapped_skill=fnresult[i],
+        #             teacherweight=0,
+        #             studentweight=0,
+        #         )
+            
+        #     ALt
+        #     bloom_df = map_topics_via_bloom(
+        #         topicslist, subject,
+        #         os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+        #     )
+        #     for i, topic in enumerate(topicslist):
+        #         row = bloom_df.iloc[i]
+        #         skills = row['skill']         
+        #         confidences = row['confidence']
+
+        #         skill_conf = {}
+        #         bloom_to_skill_map = BLOOM_TO_SKILL
+        #         for bloom_label, score in confidences.items():
+        #             for skill in bloom_to_skill_map.get(bloom_label, []):
+        #                 if skill in skills:
+        #                     skill_conf[skill] = max(skill_conf.get(skill, 0.0), score)
+
+        #         newtopic = Topics.objects.create(
+        #             topic_id=gen_topic_id(),
+        #             module=newmod,
+        #             content=topic,
+        #             mapped_skill=skills,       
+        #             teacherweight=0,
+        #             studentweight=0,
+        #         )
+        #         try:
+        #             newtopic.skill_confidence = skill_conf
+        #             newtopic.save()
+        #         except Exception:
+        #             pass 
+
+        #     #primary
+        #     hf_df = map_topics_HF_blend_2(
+        #         topicslist, subject,
+        #         os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+        #     )
+        #     for i, topic in enumerate(topicslist):
+        #         row = hf_df.iloc[i]
+
+        #         skills = row['skill']
+        #         if isinstance(skills, str):
+        #             skills = [skills]
+        #         elif not isinstance(skills, list):
+        #             skills = list(skills)
+
+        #         confidences = row['confidence'] 
+        #         skill_conf = {skill: float(confidences.get(skill, 0.0)) for skill in skills}
+
+        #         newtopic = Topics.objects.create(
+        #             topic_id=gen_topic_id(),
+        #             module=newmod,
+        #             content=topic,
+        #             mapped_skill=skills,
+        #             teacherweight=0,
+        #             studentweight=0,
+        #         )
+        #         try:
+        #             newtopic.skill_confidence = skill_conf
+        #             newtopic.save()
+        #         except Exception:
+        #             pass
+        # newcourse.hours=hours
+        # newcourse.save()
+        
+        # return redirect(f'/settings/{newcourse.course_id}')
     return render(request,"main/newclass.html")
 
 def settings(request,class_id):
