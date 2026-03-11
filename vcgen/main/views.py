@@ -426,7 +426,12 @@ def survey(request,class_id):
         context['cid']=class_id
         context['cname']=ourclass.name
         mods=Module.objects.filter(course=ourclass)
-        skills = []
+        csv_path = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+        repo = load_skill_repo_csv(csv_path)
+
+        skill_to_tier = {r["skill"]: r.get("survey_tier", r["skill"]) for r in repo}
+
+        survey_tiers = set()
         for mod in mods:
             for topic in Topics.objects.filter(module=mod):
                 mapped = topic.mapped_skill
@@ -434,10 +439,13 @@ def survey(request,class_id):
                     continue
                 if isinstance(mapped, str):
                     mapped = [mapped]
-                skills.extend(mapped)
-        skills = list(set(skills))
-        skills.sort()
-        context['skills']=skills
+                for s in mapped:
+                    tier = skill_to_tier.get(s, s)
+                    survey_tiers.add(tier)
+
+        skills = sorted(survey_tiers) 
+        print(skills)
+        context['skills'] = skills
         if request.method=="POST":
             preferredskills=""
             print(request.POST)
@@ -453,39 +461,28 @@ def survey(request,class_id):
             student.save()
 
             
-            students=Student.objects.filter(course=ourclass)
-            skillvotes={}
-            totalvotes=0
+            students = Student.objects.filter(course=ourclass)
+            skillvotes = {}
+            total_students = 0
             for s in students:
-                pref=s.skillsreq.split(",")
-                for p in pref:
-                    if p in skillvotes:
-                        skillvotes[p]+=1
-                    else:
-                        skillvotes[p]=1
-                    totalvotes+=1
+                prefs = [p.strip() for p in s.skillsreq.split(",") if p.strip()]
+                if not prefs:
+                    continue
+                total_students += 1
+                for p in prefs:
+                    skillvotes[p] = skillvotes.get(p, 0) + 1
+            
+            csv_path = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+            repo = load_skill_repo_csv(csv_path)
+            tier_map = {}
+            for r in repo:
+                tier = r.get("survey_tier", r["skill"])
+                tier_map.setdefault(tier, []).append(r["skill"])
 
-            # skillweights={a:b/totalvotes for a,b in skillvotes.items()}
-            # topicstoskills={}
-            # mods=Module.objects.filter(course=ourclass)
-            # for m in mods:
-            #     for topic in Topics.objects.filter(module=m):
-            #         if topic.mapped_skill not in topicstoskills:
-            #             topicstoskills[topic.mapped_skill]={'count':1,'topics':[topic.content]}
-            #         else:
-            #             topicstoskills[topic.mapped_skill]['count']+=1
-            #             topicstoskills[topic.mapped_skill]['topics'].append(topic.content)
-            # print(skillweights,topicstoskills)
-            # for m in mods:
-            #     for topic in Topics.objects.filter(module=m):
-            #         mappedskill=topic.mapped_skill
-            #         if mappedskill not in skillweights:
-            #             topic.studentweight=0
-            #         else:
-            #             topic.studentweight=skillweights[mappedskill]/topicstoskills[mappedskill]['count']
-            #         topic.save()
-
-            skill_demand = {a: b / totalvotes for a, b in skillvotes.items()}
+            skill_demand = {}
+            for survey_label, vote_count in skillvotes.items():
+                for tier2_skill in tier_map.get(survey_label, [survey_label]):
+                    skill_demand[tier2_skill] = skill_demand.get(tier2_skill, 0) + (vote_count / max(1, total_students))
             mods = Module.objects.filter(course=ourclass)
             all_topics = []
             modules_map = {}
