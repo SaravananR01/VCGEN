@@ -1562,3 +1562,135 @@ def update_progress(request, class_id):
         return redirect(f'/results/{class_id}')
 
     return render(request, "main/dynamic.html", context=context)
+
+def analytics(request, class_id):
+    context = {}
+    if 'user' not in request.session:
+        return redirect('login')
+    else:
+        context['name'] = Teacher.objects.filter(teacher_id=request.session['user'])[0].name
+
+    ourclass = Course.objects.filter(course_id=class_id).first()
+    if not ourclass:
+        return redirect('classes')
+
+    modules = Module.objects.filter(course=ourclass)
+    all_topics = []
+    for mod in modules:
+        for topic in Topics.objects.filter(module=mod):
+            all_topics.append((mod, topic))
+
+    students = Student.objects.filter(course=ourclass)
+    context['cid']           = class_id
+    context['cname']         = ourclass.name
+    context['total_students']= students.count()
+    context['total_topics']  = len(all_topics)
+    context['total_modules'] = modules.count()
+    context['course_hours']  = ourclass.hours
+
+    skill_votes = {}
+    total_votes = 0
+    for s in students:
+        for p in s.skillsreq.split(","):
+            p = p.strip()
+            if p:
+                skill_votes[p] = skill_votes.get(p, 0) + 1
+                total_votes += 1
+
+    sorted_skills = sorted(skill_votes.items(), key=lambda x: x[1], reverse=True)
+    skill_labels  = [s[0] for s in sorted_skills]
+    skill_counts  = [s[1] for s in sorted_skills]
+
+    context['skill_labels'] = skill_labels
+    context['skill_votes']  = skill_counts
+    context['top_skill']    = skill_labels[0] if skill_labels else "—"
+
+    all_mapped_skills = set()
+    for _, topic in all_topics:
+        mapped = topic.mapped_skill or []
+        if isinstance(mapped, str):
+            mapped = [mapped]
+        all_mapped_skills.update(mapped)
+
+    hm_skill_order = skill_labels + [s for s in sorted(all_mapped_skills) if s not in skill_labels]
+    context['skill_labels'] = hm_skill_order  
+
+    def _conf_color(val):
+        """Return hex bg and text color for a 0-1 confidence value."""
+        if val <= 0:
+            return "#f0f8f6", "#c0d4d0"         
+        r = int(0xda + (0x3d - 0xda) * val)
+        g = int(0xf0 + (0x9e - 0xf0) * val)
+        b = int(0xee + (0x85 - 0xee) * val)
+        bg = f"#{r:02x}{g:02x}{b:02x}"
+        text = "#fff" if val > 0.55 else "#2e3a35"
+        return bg, text
+
+    heatmap_rows = []
+    for mod, topic in all_topics:
+        mapped    = topic.mapped_skill or []
+        if isinstance(mapped, str):
+            mapped = [mapped]
+        conf_dict = topic.skill_confidence or {}
+
+        cells = []
+        for skill in hm_skill_order:
+            if skill in mapped:
+                raw = conf_dict.get(skill, 0.5)
+                val = round(float(raw), 2)
+            else:
+                val = 0.0
+            bg, fg = _conf_color(val)
+            cells.append({
+                "skill":      skill,
+                "val":        val,
+                "has_val":    val > 0,   
+                "color":      bg,
+                "text_color": fg,
+            })
+
+        heatmap_rows.append({
+            "topic": topic.content,
+            "cells": cells,
+        })
+
+    context['heatmap_rows'] = heatmap_rows
+
+    max_mod_hrs = 1
+    module_alloc = []
+    for mod in modules:
+        t_hrs, s_hrs = 0.0, 0.0
+        for topic in Topics.objects.filter(module=mod):
+            t_hrs += round(float(topic.teacherweight) * float(mod.hours) * float(ourclass.split), 2)
+            s_hrs += round(float(topic.studentweight) * float(ourclass.hours) * (1 - float(ourclass.split)), 2)
+        total = t_hrs + s_hrs
+        if total > max_mod_hrs:
+            max_mod_hrs = total
+        module_alloc.append({
+            "name":        mod.name,
+            "teacher_hrs": round(t_hrs, 1),
+            "student_hrs": round(s_hrs, 1),
+            "total":       round(total, 1),
+        })
+
+    for m in module_alloc:
+        m['teacher_pct'] = round(m['teacher_hrs'] / max_mod_hrs * 100, 1)
+        m['student_pct'] = round(m['student_hrs'] / max_mod_hrs * 100, 1)
+
+    context['module_alloc'] = module_alloc
+
+    topic_hours = []
+    for mod, topic in all_topics:
+        t_hrs = round(float(topic.teacherweight) * float(mod.hours) * float(ourclass.split), 2)
+        s_hrs = round(float(topic.studentweight) * float(ourclass.hours) * (1 - float(ourclass.split)), 2)
+        topic_hours.append({"name": topic.content, "hours": round(t_hrs + s_hrs, 2)})
+
+    topic_hours.sort(key=lambda x: x['hours'], reverse=True)
+    top_n = topic_hours[:12]
+    max_th = max((t['hours'] for t in top_n), default=1)
+    for t in top_n:
+        t['pct'] = round(t['hours'] / max_th * 100, 1)
+
+    context['top_topics'] = top_n
+
+    return render(request, "main/analytics.html", context=context)

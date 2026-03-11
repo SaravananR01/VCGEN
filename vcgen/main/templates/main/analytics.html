@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Analytics – {{ cname }}{% endblock %}
+
+{% block body %}
+
+{# Safely embed Python lists as JSON for JS consumption #}
+{{ skill_labels|json_script:"skill-labels-data" }}
+{{ skill_votes|json_script:"skill-votes-data" }}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+  .dash-wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  .dash-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 2.5rem; flex-wrap: wrap; gap: 1rem;
+  }
+  .dash-header h1 { font-size: 2rem; margin: 0; line-height: 1.2; color: #2e3a35; }
+  .dash-header h1 span { color: #6db8a3; }
+  .dash-sub { color: #9db5b2; font-size: .88rem; margin-top: .3rem; }
+
+  .back-btn {
+    background: #94d1be; color: #fff; font-weight: 600; border: none;
+    padding: .6rem 1.4rem; border-radius: 10px; cursor: pointer; font-size: .9rem;
+    transition: background .2s;
+  }
+  .back-btn:hover { background: #7ab8a8; }
+
+  /* stat pills */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: #fff; border-radius: 14px; padding: 1.2rem 1.4rem;
+    border: 1.5px solid #daf0ee; box-shadow: 0 2px 8px rgba(148,209,190,.12);
+  }
+  .stat-val { font-size: 1.9rem; font-weight: 700; color: #6db8a3; }
+  .stat-lbl { font-size: .75rem; color: #9db5b2; text-transform: uppercase;
+              letter-spacing: .08em; margin-top: .25rem; }
+
+  /* section title */
+  .sec-title {
+    font-size: 1.1rem; font-weight: 700; color: #2e3a35;
+    margin: 0 0 1rem; display: flex; align-items: center; gap: .6rem;
+  }
+  .sec-title::after {
+    content: ''; flex: 1; height: 2px;
+    background: #daf0ee; border-radius: 2px;
+  }
+
+  /* layout */
+  .two-col {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1.5rem; margin-bottom: 2rem;
+  }
+  .full-col { margin-bottom: 2rem; }
+  @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* chart cards */
+  .chart-card {
+    background: #fff; border-radius: 14px; padding: 1.5rem;
+    border: 1.5px solid #daf0ee; box-shadow: 0 2px 12px rgba(148,209,190,.1);
+  }
+  .chart-card canvas { max-height: 320px; }
+
+  /* heatmap */
+  .heatmap-scroll { overflow-x: auto; }
+  .heatmap-table { border-collapse: separate; border-spacing: 3px; }
+  .hm-corner { width: 160px; }
+  .hm-col-header {
+    font-size: .68rem; font-weight: 600; color: #9db5b2;
+    text-align: center; padding: .25rem .2rem;
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    max-height: 100px; vertical-align: bottom; white-space: nowrap;
+  }
+  .hm-row-label {
+    font-size: .78rem; font-weight: 500; color: #2e3a35;
+    padding: .3rem .5rem; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 160px;
+  }
+  .hm-cell {
+    width: 36px; height: 32px; border-radius: 5px;
+    font-size: .65rem; font-weight: 700; text-align: center;
+    vertical-align: middle; cursor: default;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .hm-cell:hover { transform: scale(1.15); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+
+  /* module bars */
+  .mod-section { margin-bottom: 1.2rem; }
+  .mod-section-name { font-weight: 600; font-size: .88rem; margin-bottom: .5rem; color: #2e3a35; }
+  .bar-row { display: grid; grid-template-columns: 80px 1fr 54px;
+             align-items: center; gap: .7rem; margin-bottom: .35rem; }
+  .bar-lbl { font-size: .75rem; color: #9db5b2; font-weight: 500; }
+  .bar-track { background: #daf0ee; border-radius: 99px; height: 13px; overflow: hidden; }
+  .bar-fill-t { height: 100%; border-radius: 99px;
+                background: linear-gradient(90deg, #94d1be, #5fb99e); }
+  .bar-fill-s { height: 100%; border-radius: 99px;
+                background: linear-gradient(90deg, #f6d06a, #e8a838); }
+  .bar-hrs { font-size: .8rem; font-weight: 700; color: #6db8a3; text-align: right; }
+
+  .legend-row { display: flex; gap: 1.2rem; margin-bottom: 1rem; font-size: .8rem; font-weight: 500; }
+  .leg-swatch { display: inline-block; width: 12px; height: 12px;
+                border-radius: 3px; margin-right: .35rem; vertical-align: middle; }
+
+  /* top topics */
+  .tf-list { display: flex; flex-direction: column; gap: .65rem; }
+  .tf-row { display: grid; grid-template-columns: 1fr 200px 52px;
+            align-items: center; gap: .8rem; font-size: .83rem; }
+  .tf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2e3a35; }
+  .tf-track { background: #daf0ee; border-radius: 99px; height: 10px; overflow: hidden; }
+  .tf-fill  { height: 100%; border-radius: 99px;
+              background: linear-gradient(90deg, #94d1be, #5fb99e); }
+  .tf-hrs   { font-weight: 700; color: #6db8a3; text-align: right; font-size: .8rem; }
+
+  .empty-note { color: #9db5b2; font-size: .85rem; font-style: italic; padding: 1rem 0; }
+
+  /* pure HTML skill vote bars */
+  .skill-bar-list { display: flex; flex-direction: column; gap: .6rem; }
+  .skill-bar-row {
+    display: grid;
+    grid-template-columns: 210px 1fr 32px;
+    align-items: center;
+    gap: .75rem;
+    font-size: .82rem;
+  }
+  .skill-bar-name {
+    text-align: right;
+    font-weight: 500;
+    color: #2e3a35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .skill-bar-track {
+    background: #daf0ee;
+    border-radius: 99px;
+    height: 14px;
+    overflow: hidden;
+  }
+  .skill-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width .5s ease;
+  }
+  .skill-bar-count {
+    font-weight: 700;
+    color: #6db8a3;
+    font-size: .8rem;
+    text-align: left;
+  }
+</style>
+
+<div class="dash-wrap">
+
+  <!-- Header -->
+  <div class="dash-header">
+    <div>
+      <h1>{{ cname }} <span>({{ cid }})</span></h1>
+      <div class="dash-sub">Analytics Dashboard</div>
+    </div>
+    <button class="back-btn" onclick="location.href='/results/{{ cid }}'">&#8592; Back to Results</button>
+  </div>
+
+  <!-- Stat pills -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-val">{{ total_students }}</div>
+      <div class="stat-lbl">Students</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">{{ total_topics }}</div>
+      <div class="stat-lbl">Topics</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">{{ total_modules }}</div>
+      <div class="stat-lbl">Modules</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">{{ course_hours }}h</div>
+      <div class="stat-lbl">Course Hours</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="font-size:1.05rem;padding-top:.5rem;">{{ top_skill }}</div>
+      <div class="stat-lbl">Top Skill</div>
+    </div>
+  </div>
+
+  <!-- Row 1: Charts -->
+  <div class="two-col">
+    <div class="chart-card">
+      <div class="sec-title">Skill Demand</div>
+      {% if skill_labels %}
+        <canvas id="skillPie"></canvas>
+      {% else %}
+        <div class="empty-note">No student responses yet.</div>
+      {% endif %}
+    </div>
+    <div class="chart-card">
+      <div class="sec-title">Skill Vote Counts</div>
+      {% if skill_labels %}
+        <div id="skillBarHTML"></div>
+      {% else %}
+        <div class="empty-note">No student responses yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Row 2: Heatmap -->
+  <div class="full-col chart-card">
+    <div class="sec-title">Topic &times; Skill Heatmap</div>
+    <p style="font-size:.8rem;color:#9db5b2;margin:-.4rem 0 1rem;">
+      Confidence score of each topic's skill mapping. Darker = stronger alignment.
+    </p>
+    {% if heatmap_rows %}
+    <div class="heatmap-scroll">
+      <table class="heatmap-table">
+        <thead>
+          <tr>
+            <th class="hm-corner"></th>
+            {% for skill in skill_labels %}
+            <th class="hm-col-header" title="{{ skill }}">{{ skill }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in heatmap_rows %}
+          <tr>
+            <td class="hm-row-label" title="{{ row.topic }}">{{ row.topic }}</td>
+            {% for cell in row.cells %}
+            <td class="hm-cell"
+                style="background:{{ cell.color }};color:{{ cell.text_color }};"
+                title="{{ cell.skill }}: {{ cell.val }}">
+              {% if cell.has_val %}{{ cell.val }}{% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty-note">No topics found.</div>
+    {% endif %}
+  </div>
+
+  <!-- Row 3: Module allocation -->
+  <div class="full-col chart-card">
+    <div class="sec-title">Module Time Allocation</div>
+    <div class="legend-row">
+      <span>
+        <span class="leg-swatch" style="background:linear-gradient(90deg,#94d1be,#5fb99e);"></span>Teacher hours
+      </span>
+      <span>
+        <span class="leg-swatch" style="background:linear-gradient(90deg,#f6d06a,#e8a838);"></span>Student hours
+      </span>
+    </div>
+    {% if module_alloc %}
+      {% for mod in module_alloc %}
+      <div class="mod-section">
+        <div class="mod-section-name">{{ mod.name }}</div>
+        <div class="bar-row">
+          <div class="bar-lbl">Teacher</div>
+          <div class="bar-track">
+            <div class="bar-fill-t" style="width:{{ mod.teacher_pct }}%;"></div>
+          </div>
+          <div class="bar-hrs">{{ mod.teacher_hrs }}h</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-lbl">Student</div>
+          <div class="bar-track">
+            <div class="bar-fill-s" style="width:{{ mod.student_pct }}%;"></div>
+          </div>
+          <div class="bar-hrs">{{ mod.student_hrs }}h</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-note">No module data available.</div>
+    {% endif %}
+  </div>
+
+  <!-- Row 4: Top topics -->
+  <div class="full-col chart-card">
+    <div class="sec-title">Top Topics by Total Hours</div>
+    {% if top_topics %}
+    <div class="tf-list">
+      {% for t in top_topics %}
+      <div class="tf-row">
+        <div class="tf-name" title="{{ t.name }}">{{ forloop.counter }}. {{ t.name }}</div>
+        <div class="tf-track">
+          <div class="tf-fill" style="width:{{ t.pct }}%;"></div>
+        </div>
+        <div class="tf-hrs">{{ t.hours }}h</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="empty-note">No topic hour data available.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  const PALETTE = [
+    '#5fb99e','#94d1be','#bfe3db','#f6d06a','#e8a838',
+    '#7ab8a8','#3d9e85','#c8ebe4','#a3cfc6','#d4a017',
+  ];
+
+  // json_script renders proper JSON (double-quoted strings) — safe to parse
+  const skillLabels = JSON.parse(document.getElementById('skill-labels-data').textContent);
+  const skillVotes  = JSON.parse(document.getElementById('skill-votes-data').textContent);
+
+  if (skillLabels.length > 0) {
+    new Chart(document.getElementById('skillPie'), {
+      type: 'doughnut',
+      data: {
+        labels: skillLabels,
+        datasets: [{
+          data: skillVotes,
+          backgroundColor: PALETTE,
+          borderWidth: 2,
+          borderColor: '#fff',
+          hoverOffset: 8,
+        }]
+      },
+      options: {
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { font: { size: 12 }, padding: 14 }
+          }
+        },
+        cutout: '55%',
+      }
+    });
+
+    // Pure HTML bar chart — no label truncation issues
+    const maxVote = Math.max(...skillVotes);
+    const container = document.getElementById('skillBarHTML');
+    container.className = 'skill-bar-list';
+    skillLabels.forEach((label, i) => {
+      const pct = maxVote > 0 ? (skillVotes[i] / maxVote * 100).toFixed(1) : 0;
+      const color = PALETTE[i % PALETTE.length];
+      container.innerHTML += `
+        <div class="skill-bar-row">
+          <div class="skill-bar-name" title="${label}">${label}</div>
+          <div class="skill-bar-track">
+            <div class="skill-bar-fill" style="width:${pct}%;background:${color};"></div>
+          </div>
+          <div class="skill-bar-count">${skillVotes[i]}</div>
+        </div>`;
+    });
+  }
+</script>
+
+{% endblock %}
