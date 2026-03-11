@@ -36,18 +36,18 @@ def build_skill_block_for_prompt(repo: list) -> str:
     lines = []
     for i, r in enumerate(repo, 1):
         skill = r["skill"]
-        desc  = r.get("embed_description", "") or r.get("student_desc", "") or skill
+        desc  = r.get("description", "") or r.get("student_desc", "") or skill
         first_sentence = desc.split(".")[0].strip() + "."
         lines.append(f"{i}. {skill}: {first_sentence}")
     return "\n".join(lines)
 
 def load_skill_repo_csv(csv_path):
-    df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path,encoding="cp1252")
     repo = []
     for _, r in df.iterrows():
         repo.append({
             "skill":             r["skill"],
-            "embed_description": r.get("embed_description", "") or r.get("student_desc", ""),
+            "description": r.get("description", "") or r.get("student_desc", ""),
             "survey_tier":       r.get("survey_tier", ""),        
             "department_tags":   r.get("department_tags", ""),    
         })
@@ -65,7 +65,7 @@ def map_all_topics_with_groq(
     valid_skills = [r["skill"] for r in repo]
 
     skill_block = "\n".join(
-        f"{i}. {r['skill']}: {(r.get('embed_description','') or r.get('student_desc','')).split('.')[0]}."
+        f"{i}. {r['skill']}: {r['description']}"
         for i, r in enumerate(repo, 1)
     )
 
@@ -158,9 +158,9 @@ Rules:
                           if k in valid_skills}
 
                 if not skills:
-                    print(f"[Groq VALIDATION FAIL] topic='{topic}' "
-                          f"got unknown skills: {entry.get('skills', [])}")
-                    skills = [valid_skills[0]]
+                    print(f"[MAPPING FAIL] '{topic}' returned unknown skills: {entry.get('skills')}. Flagged for review.")
+                    result[topic] = {"skill": ["UNMAPPED"], "confidence": {}}
+                    continue
 
                 result[topic] = {"skill": skills, "confidence": conf}
 
