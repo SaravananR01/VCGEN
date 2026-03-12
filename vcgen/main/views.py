@@ -55,17 +55,14 @@ def map_all_topics_with_groq(
     modules_data: list[dict],
     subject_context: str,
     csv_path: str,
-    batch_size: int = 6,        
+    batch_size: int = 3,        
 ) -> dict[str, dict]:
 
     repo         = load_skill_repo_csv(csv_path)
     client       = get_groq_client()
     valid_skills = [r["skill"] for r in repo]
 
-    skill_block = "\n".join(
-        f"{i}. {r['skill']}: {r['description']}"
-        for i, r in enumerate(repo, 1)
-    )
+    skill_block = build_skill_block_for_prompt(repo)
 
     all_topics_flat = []
     for mod in modules_data:
@@ -81,7 +78,7 @@ def map_all_topics_with_groq(
 
     for batch_num, batch in enumerate(batches):
         syllabus_block = "\n".join(
-            f"  - [{mod}] {topic}" for mod, topic in batch
+            f"  - {topic}" for topic in batch
         )
 
         prompt = f"""Map each course topic to 1-3 academic skills from the list below.
@@ -106,7 +103,8 @@ Rules:
         for attempt in range(3):
             try:
                 response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
+                    #model="llama-3.3-70b-versatile",
                     messages=[
                         {
                             "role": "system",
@@ -171,7 +169,7 @@ Rules:
                 result[topic] = {"skill": [best], "confidence": {best: 0.5}}
 
         if batch_num < len(batches) - 1:
-            time.sleep(15)
+            time.sleep(30)
 
     return result
 
@@ -882,7 +880,7 @@ def newclass(request):
         print(topic_map)
         for mod_data in modules_data:
             for topic in mod_data["topics"]:
-                mapping    = topic_map.get(topic, {"skill": ["Conceptual Understanding"], "confidence": {}})
+                mapping    = topic_map.get(topic, {"skill": ["Foundations & Theory"], "confidence": {}})
                 skills     = mapping["skill"]
                 skill_conf = mapping["confidence"]
 
