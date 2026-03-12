@@ -4,8 +4,6 @@ from .models import Teacher,Course,Module,Topics,Student
 import random,re,os
 import pandas as pd
 import numpy as np
-from sentence_transformers import SentenceTransformer,util
-from transformers import pipeline
 from django.http import HttpResponse
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
@@ -472,8 +470,6 @@ def survey(request,class_id):
                 for p in prefs:
                     skillvotes[p] = skillvotes.get(p, 0) + 1
             
-            csv_path = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
-            repo = load_skill_repo_csv(csv_path)
             tier_map = {}
             for r in repo:
                 tier = r.get("survey_tier", r["skill"])
