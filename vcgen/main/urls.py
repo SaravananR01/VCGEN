@@ -20,4 +20,5 @@ urlpatterns=[
     path("closeresponses/<str:class_id>",views.closeresponses,name="closeresponses"),
     path("updateprogress/<str:class_id>",views.update_progress,name="update_progress"),
     path('analytics/<str:class_id>/', views.analytics, name='analytics'),
+    path('validate/<str:class_id>/', views.validate_schedule, name='validate_schedule'),
 ]

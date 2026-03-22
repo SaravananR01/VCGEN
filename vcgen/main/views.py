@@ -15,6 +15,7 @@ from groq import Groq
 from dotenv import load_dotenv
 import json, os, re
 import time
+from scipy.stats import spearmanr
 
 from dataclasses import dataclass
 from typing import List, Dict, Any
@@ -163,9 +164,10 @@ Rules:
         except (json.JSONDecodeError, Exception) as e:
             print(f"[Groq JSON ERROR] batch={batch_num+1}: {e}")
             print(f"[Groq] raw was: {raw[:300]}")
-            for _, topic in batch:
-                kw_scores = {r["skill"]: keyword_score(topic, r) for r in repo}
-                best      = max(kw_scores, key=kw_scores.get)
+            for mod, topic in batch:
+                topic_lower = topic.lower()
+                matched = [s for s in valid_skills if s.lower() in topic_lower]
+                best = matched[0] if matched else valid_skills[0]
                 result[topic] = {"skill": [best], "confidence": {best: 0.5}}
 
         if batch_num < len(batches) - 1:
@@ -1299,3 +1301,203 @@ def analytics(request, class_id):
     context['top_topics'] = top_n
 
     return render(request, "main/analytics.html", context=context)
+
+def validate_schedule(request, class_id):
+    """
+    Validation dashboard for VCGEN schedule quality.
+ 
+    Metrics computed:
+    1. Demand Coverage Score     — how well student votes are reflected in hours
+    2. Skill Alignment Score     — weighted Spearman ρ between vote-rank & hour-rank
+    3. Proportionality Score     — are hours proportional to topic weights (teacher)?
+    4. Floor Guarantee Check     — no topic starved of its minimum share
+    5. LP Optimality Proxy       — objective value vs. upper bound (full demand)
+    6. Skill Distribution Gini   — concentration of student hours across skills
+    """
+
+ 
+    context = {}
+    if 'user' not in request.session:
+        return redirect('login')
+    context['name'] = Teacher.objects.filter(teacher_id=request.session['user'])[0].name
+ 
+    ourclass = Course.objects.filter(course_id=class_id).first()
+    if not ourclass:
+        return redirect('classes')
+ 
+    modules   = Module.objects.filter(course=ourclass)
+    students  = Student.objects.filter(course=ourclass)
+ 
+    context['cid']   = class_id
+    context['cname'] = ourclass.name
+ 
+    skillvotes  = {}
+    totalvotes  = 0
+    for s in students:
+        for p in s.skillsreq.split(","):
+            p = p.strip()
+            if p:
+                skillvotes[p] = skillvotes.get(p, 0) + 1
+                totalvotes   += 1
+ 
+    skill_demand_norm = {k: v / totalvotes for k, v in skillvotes.items()} if totalvotes else {}
+ 
+    all_topics   = []
+    modules_map  = {}
+    for mod in modules:
+        modules_map[mod.module_id] = mod
+        for topic in Topics.objects.filter(module=mod):
+            all_topics.append((mod, topic))
+ 
+    student_pool = float(ourclass.hours) * (1.0 - float(ourclass.split))
+ 
+    topic_data = []
+    for mod, topic in all_topics:
+        s_hrs = round(
+            float(topic.studentweight) * student_pool, 4
+        )
+        t_hrs = round(
+            float(topic.teacherweight) * float(mod.hours) * float(ourclass.split), 4
+        )
+        mapped = topic.mapped_skill or []
+        if isinstance(mapped, str):
+            mapped = [mapped]
+        conf   = topic.skill_confidence or {}
+ 
+        topic_data.append({
+            "topic_id":     topic.topic_id,
+            "content":      topic.content,
+            "module":       mod.name,
+            "mapped":       mapped,
+            "conf":         conf,
+            "s_hrs":        s_hrs,
+            "t_hrs":        t_hrs,
+            "total_hrs":    round(s_hrs + t_hrs, 4),
+            "t_weight":     float(topic.teacherweight),
+            "s_weight":     float(topic.studentweight),
+        })
+ 
+    n = len(topic_data)
+ 
+    if skill_demand_norm and student_pool > 0:
+        skill_covered = {}  
+        for td in topic_data:
+            for skill in td["mapped"]:
+                c = float(td["conf"].get(skill, 0.5))
+                skill_covered[skill] = skill_covered.get(skill, 0.0) + td["s_hrs"] * c
+ 
+        coverage_scores = []
+        for skill, demand_frac in skill_demand_norm.items():
+            covered_hrs  = skill_covered.get(skill, 0.0)
+            fair_share   = demand_frac * student_pool
+            ratio        = min(covered_hrs / fair_share, 1.0) if fair_share > 0 else 0.0
+            coverage_scores.append({
+                "skill":       skill,
+                "demand_pct":  round(demand_frac * 100, 1),
+                "alloc_hrs":   round(covered_hrs, 2),
+                "fair_share":  round(fair_share, 2),
+                "coverage":    round(ratio * 100, 1),
+            })
+        demand_coverage_score = round(
+            np.mean([c["coverage"] for c in coverage_scores]), 1
+        ) if coverage_scores else 0.0
+    else:
+        coverage_scores        = []
+        demand_coverage_score  = None   
+ 
+    context['coverage_scores']       = coverage_scores
+    context['demand_coverage_score'] = demand_coverage_score
+ 
+    if len(skill_demand_norm) >= 3 and skill_covered:
+        skills_in_common = [s for s in skill_demand_norm if s in skill_covered]
+        if len(skills_in_common) >= 3:
+            vote_ranks  = [skill_demand_norm[s] for s in skills_in_common]
+            hour_ranks  = [skill_covered.get(s, 0.0) for s in skills_in_common]
+            rho, pval   = spearmanr(vote_ranks, hour_ranks)
+            alignment_score = round(float(rho) * 100, 1)
+            alignment_pval  = round(float(pval), 3)
+        else:
+            alignment_score = None
+            alignment_pval  = None
+    else:
+        alignment_score = None
+        alignment_pval  = None
+ 
+    context['alignment_score'] = alignment_score
+    context['alignment_pval']  = alignment_pval
+ 
+    prop_scores = []
+    for mod in modules:
+        topics_in_mod = [td for td in topic_data if td["module"] == mod.name]
+        if not topics_in_mod:
+            continue
+        weights = np.array([td["t_weight"] for td in topics_in_mod])
+        total_w = weights.sum()
+        if total_w == 0:
+            continue
+        expected = weights / total_w
+        actual   = weights / total_w  
+        t_pool_mod = float(mod.hours) * float(ourclass.split)
+        alloc_hrs  = np.array([td["t_hrs"] for td in topics_in_mod])
+        if alloc_hrs.sum() > 0:
+            deviation = np.abs(alloc_hrs / alloc_hrs.sum() - expected).mean()
+            prop_scores.append(round((1 - deviation) * 100, 1))
+ 
+    proportionality_score = round(float(np.mean(prop_scores)), 1) if prop_scores else 100.0
+    context['proportionality_score'] = proportionality_score
+ 
+    floor_violations = []
+    for td in topic_data:
+        if td["s_weight"] == 0 and td["t_weight"] == 0:
+            continue   
+        proportional_share = td["t_weight"] * student_pool
+        floor              = proportional_share * 0.30
+        if td["s_hrs"] < floor - 0.01:   
+            floor_violations.append({
+                "topic":     td["content"],
+                "module":    td["module"],
+                "got":       round(td["s_hrs"], 2),
+                "floor":     round(floor, 2),
+            })
+ 
+    floor_score = round((1 - len(floor_violations) / max(n, 1)) * 100, 1)
+    context['floor_violations'] = floor_violations
+    context['floor_score']      = floor_score
+ 
+    if skill_demand_norm and student_pool > 0 and topic_data:
+        actual_obj = 0.0
+        upper_obj  = 0.0
+        for td in topic_data:
+            topic_demand = 0.0
+            conf_total   = 0.0
+            for skill in td["mapped"]:
+                c = float(td["conf"].get(skill, 0.5))
+                topic_demand += skill_demand_norm.get(skill, 0.0) * c
+                conf_total   += c
+            topic_demand = topic_demand / conf_total if conf_total > 0 else 0.0
+            actual_obj  += topic_demand * td["s_hrs"]
+            upper_obj   += topic_demand * student_pool   
+ 
+        lp_efficiency = round(actual_obj / upper_obj * 100, 1) if upper_obj > 0 else None
+    else:
+        lp_efficiency = None
+ 
+    context['lp_efficiency'] = lp_efficiency
+ 
+    s_hrs_arr = np.array([td["s_hrs"] for td in topic_data if td["s_weight"] > 0])
+    if len(s_hrs_arr) > 1 and s_hrs_arr.sum() > 0:
+        s_hrs_arr = np.sort(s_hrs_arr)
+        n_t = len(s_hrs_arr)
+        gini = (2 * np.sum((np.arange(1, n_t + 1)) * s_hrs_arr) / (n_t * s_hrs_arr.sum())) - (n_t + 1) / n_t
+        gini = round(float(gini), 3)
+    else:
+        gini = None
+ 
+    context['gini'] = gini
+ 
+    context['topic_data'] = topic_data
+    context['student_pool'] = round(student_pool, 2)
+    context['n_students']   = students.count()
+    context['split_pct']    = round(float(ourclass.split) * 100, 1)
+ 
+    return render(request, "main/validate.html", context=context)

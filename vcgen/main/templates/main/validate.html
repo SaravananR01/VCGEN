@@ -1,0 +1,462 @@
+{% extends "base.html" %}
+{% block title %}Validate Schedule — {{ cname }}{% endblock %}
+
+{% block body %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  /* All rules scoped to .validate-page — no global resets that break Tailwind/navbar */
+  .validate-page {
+    --ink:     #1e2a25;
+    --sage:    #94d1be;
+    --sage-lt: #daf0ee;
+    --sage-md: #9db5b2;
+    --warn:    #e8a87c;
+    --danger:  #e07070;
+    --good:    #5bb38a;
+    --mono:    'DM Mono', monospace;
+    --head:    'Syne', sans-serif;
+    font-family: var(--head);
+    color: var(--ink);
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  .validate-page .btn-back {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: white; border: 2px solid var(--sage); color: var(--ink);
+    font-family: var(--head); font-weight: 700; font-size: .85rem;
+    padding: .5rem 1rem; border-radius: 8px; cursor: pointer;
+    text-decoration: none; margin-bottom: 2rem;
+    transition: background .2s, transform .15s;
+  }
+  .validate-page .btn-back:hover { background: var(--sage-lt); transform: translateX(-2px); }
+
+  .validate-page .hero {
+    background: white; border: 2px solid var(--sage);
+    border-radius: 20px; padding: 2rem 2.5rem; margin-bottom: 2rem;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    flex-wrap: wrap; gap: 1rem;
+  }
+  .validate-page .hero-title { font-size: 2rem; font-weight: 800; line-height: 1.1; }
+  .validate-page .hero-sub   { font-family: var(--mono); font-size: .8rem; color: var(--sage-md); margin-top: .3rem; }
+  .validate-page .hero-meta  { font-family: var(--mono); font-size: .8rem; text-align: right; }
+  .validate-page .hero-meta span { display: block; }
+
+  .validate-page .score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .validate-page .score-card {
+    background: white; border: 2px solid var(--sage);
+    border-radius: 16px; padding: 1.25rem 1rem;
+    display: flex; flex-direction: column; align-items: center; gap: .4rem;
+    position: relative; overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .validate-page .score-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px #94d1be33; }
+  .validate-page .score-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  }
+  .validate-page .score-card.good::before    { background: var(--good); }
+  .validate-page .score-card.warn::before    { background: var(--warn); }
+  .validate-page .score-card.danger::before  { background: var(--danger); }
+  .validate-page .score-card.neutral::before { background: var(--sage-md); }
+
+  .validate-page .score-label {
+    font-size: .7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--sage-md); text-align: center;
+  }
+  .validate-page .score-value {
+    font-family: var(--mono); font-size: 2rem; font-weight: 500; color: var(--ink); line-height: 1;
+  }
+  .validate-page .score-unit { font-family: var(--mono); font-size: .75rem; color: var(--sage-md); text-align: center; }
+  .validate-page .score-desc { font-size: .7rem; color: var(--sage-md); text-align: center; margin-top: .2rem; }
+
+  .validate-page .section { margin-bottom: 2rem; }
+  .validate-page .section-title {
+    font-size: 1rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--ink);
+    border-left: 4px solid var(--sage); padding-left: .75rem; margin-bottom: 1rem;
+  }
+
+  .validate-page .coverage-table { width: 100%; border-collapse: collapse; }
+  .validate-page .coverage-table th {
+    font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--sage-md);
+    padding: .5rem .75rem; text-align: left; border-bottom: 1px solid var(--sage-lt);
+  }
+  .validate-page .coverage-table td {
+    padding: .6rem .75rem; vertical-align: middle; font-size: .85rem;
+    border-bottom: 1px solid var(--sage-lt);
+  }
+  .validate-page .bar-wrap {
+    background: var(--sage-lt); border-radius: 20px; height: 10px;
+    width: 140px; overflow: hidden; display: inline-block; vertical-align: middle;
+  }
+  .validate-page .bar-fill { height: 100%; border-radius: 20px; transition: width .6s ease; }
+  .validate-page .bar-fill.green  { background: var(--good); }
+  .validate-page .bar-fill.orange { background: var(--warn); }
+  .validate-page .bar-fill.red    { background: var(--danger); }
+
+  .validate-page .violation-list { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
+  .validate-page .violation-item {
+    background: #fff5f5; border: 1px solid #f5c6c6; border-radius: 10px;
+    padding: .75rem 1rem; display: flex; justify-content: space-between;
+    align-items: center; font-size: .85rem; flex-wrap: wrap; gap: .5rem;
+  }
+  .validate-page .violation-badge {
+    font-family: var(--mono); font-size: .75rem;
+    background: var(--danger); color: white; padding: .2rem .5rem; border-radius: 6px;
+  }
+  .validate-page .ok-msg {
+    background: #f0faf7; border: 1px solid #b2ddd0; border-radius: 10px;
+    padding: .75rem 1rem; font-size: .85rem; color: var(--good); font-weight: 700;
+  }
+
+  .validate-page .topic-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  .validate-page .topic-table th {
+    font-family: var(--mono); font-size: .68rem; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--sage-md);
+    padding: .5rem .6rem; text-align: left; border-bottom: 2px solid var(--sage); white-space: nowrap;
+  }
+  .validate-page .topic-table td {
+    padding: .55rem .6rem; border-bottom: 1px solid var(--sage-lt); vertical-align: middle;
+  }
+  .validate-page .topic-table tr:hover td { background: var(--sage-lt); }
+
+  .validate-page .tag {
+    display: inline-block; font-family: var(--mono); font-size: .68rem;
+    background: var(--sage-lt); border: 1px solid var(--sage-md);
+    color: var(--ink); padding: .15rem .4rem; border-radius: 5px; margin: .1rem; white-space: nowrap;
+  }
+  .validate-page .hrs { font-family: var(--mono); white-space: nowrap; }
+
+  .validate-page .gini-track {
+    background: linear-gradient(to right, var(--good), var(--warn), var(--danger));
+    border-radius: 20px; height: 12px; position: relative; margin: .5rem 0;
+  }
+  .validate-page .gini-needle {
+    position: absolute; top: -4px; width: 4px; height: 20px;
+    background: var(--ink); border-radius: 2px; transform: translateX(-50%);
+    transition: left .8s cubic-bezier(.4,0,.2,1);
+  }
+  .validate-page .gini-labels {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: .68rem; color: var(--sage-md);
+  }
+
+  .validate-page .no-data {
+    background: white; border: 2px dashed var(--sage-md); border-radius: 12px;
+    padding: 1.5rem; text-align: center; color: var(--sage-md); font-size: .9rem;
+  }
+  .validate-page .explain {
+    background: white; border-left: 4px solid var(--sage);
+    border-radius: 0 12px 12px 0; padding: 1rem 1.25rem;
+    font-size: .82rem; line-height: 1.7; color: #445; margin-bottom: 1rem;
+  }
+  .validate-page .explain code {
+    font-family: var(--mono); background: var(--sage-lt);
+    padding: .1em .3em; border-radius: 4px; font-size: .85em;
+  }
+  .validate-page .info-card {
+    background: white; border: 2px solid var(--sage); border-radius: 12px; padding: 1.25rem 1.5rem;
+  }
+  .validate-page .big-num { font-family: var(--mono); font-size: 2.5rem; line-height: 1; }
+  .validate-page .body-sm { font-size: .85rem; line-height: 1.7; flex: 1; }
+  .validate-page .mono-sm { font-family: var(--mono); font-size: .75rem; color: var(--sage-md); }
+</style>
+
+<div class="validate-page">
+
+  <a class="btn-back" href="/results/{{ cid }}">← Back to Results</a>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div>
+      <div class="hero-title">Schedule Validation</div>
+      <div class="hero-sub">{{ cname }} &nbsp;·&nbsp; {{ cid }}</div>
+    </div>
+    <div class="hero-meta">
+      <span>{{ n_students }} student response{{ n_students|pluralize }}</span>
+      <span>{{ student_pool }} student hours available</span>
+      <span>{{ split_pct }}% teacher · {{ 100|add:"-"|add:split_pct|floatformat:0 }}% student split</span>
+    </div>
+  </div>
+
+  <!-- Score cards -->
+  <div class="score-grid">
+
+    {% if demand_coverage_score is not None %}
+      {% if demand_coverage_score >= 75 %}<div class="score-card good">
+      {% elif demand_coverage_score >= 50 %}<div class="score-card warn">
+      {% else %}<div class="score-card danger">{% endif %}
+    {% else %}<div class="score-card neutral">{% endif %}
+      <div class="score-label">Demand Coverage</div>
+      <div class="score-value">{% if demand_coverage_score is not None %}{{ demand_coverage_score }}{% else %}—{% endif %}</div>
+      <div class="score-unit">%</div>
+      <div class="score-desc">Skill votes → hour allocation</div>
+    </div>
+
+    {% if alignment_score is not None %}
+      {% if alignment_score >= 60 %}<div class="score-card good">
+      {% elif alignment_score >= 30 %}<div class="score-card warn">
+      {% else %}<div class="score-card danger">{% endif %}
+    {% else %}<div class="score-card neutral">{% endif %}
+      <div class="score-label">Skill Alignment ρ</div>
+      <div class="score-value">{% if alignment_score is not None %}{{ alignment_score }}{% else %}—{% endif %}</div>
+      <div class="score-unit">Spearman × 100</div>
+      <div class="score-desc">Vote rank vs hour rank</div>
+    </div>
+
+    {% if proportionality_score >= 90 %}<div class="score-card good">
+    {% elif proportionality_score >= 70 %}<div class="score-card warn">
+    {% else %}<div class="score-card danger">{% endif %}
+      <div class="score-label">Proportionality</div>
+      <div class="score-value">{{ proportionality_score }}</div>
+      <div class="score-unit">%</div>
+      <div class="score-desc">Teacher weights → hours</div>
+    </div>
+
+    {% if floor_score >= 95 %}<div class="score-card good">
+    {% elif floor_score >= 80 %}<div class="score-card warn">
+    {% else %}<div class="score-card danger">{% endif %}
+      <div class="score-label">Floor Guarantee</div>
+      <div class="score-value">{{ floor_score }}</div>
+      <div class="score-unit">%</div>
+      <div class="score-desc">Topics above minimum</div>
+    </div>
+
+    {% if lp_efficiency is not None %}
+      {% if lp_efficiency >= 70 %}<div class="score-card good">
+      {% elif lp_efficiency >= 45 %}<div class="score-card warn">
+      {% else %}<div class="score-card danger">{% endif %}
+    {% else %}<div class="score-card neutral">{% endif %}
+      <div class="score-label">LP Efficiency</div>
+      <div class="score-value">{% if lp_efficiency is not None %}{{ lp_efficiency }}{% else %}—{% endif %}</div>
+      <div class="score-unit">%</div>
+      <div class="score-desc">Objective vs upper bound</div>
+    </div>
+
+    {% if gini is not None %}
+      {% if gini <= 0.4 %}<div class="score-card good">
+      {% elif gini <= 0.65 %}<div class="score-card warn">
+      {% else %}<div class="score-card danger">{% endif %}
+    {% else %}<div class="score-card neutral">{% endif %}
+      <div class="score-label">Hour Gini</div>
+      <div class="score-value">{% if gini is not None %}{{ gini }}{% else %}—{% endif %}</div>
+      <div class="score-unit">0 = equal · 1 = concentrated</div>
+      <div class="score-desc">Distribution of student hours</div>
+    </div>
+
+  </div>
+
+  <!-- 1. Demand Coverage -->
+  <div class="section">
+    <div class="section-title">1 · Demand Coverage</div>
+    <div class="explain">
+      <strong>What this measures:</strong> For each skill students voted for, we compare student-hours
+      allocated to topics teaching that skill (weighted by confidence) against the <em>fair share</em>
+      implied by the vote fraction.
+      Coverage = <code>min(allocated / fair_share, 1)</code> per skill, averaged across all demanded skills.
+      A score of <strong>100%</strong> means every demanded skill received at least its proportional share.
+    </div>
+    {% if coverage_scores %}
+    <table class="coverage-table">
+      <thead>
+        <tr>
+          <th>Skill</th><th>Vote %</th><th>Fair Share (hrs)</th><th>Allocated (hrs)</th><th>Coverage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in coverage_scores %}
+        <tr>
+          <td>{{ row.skill }}</td>
+          <td class="hrs">{{ row.demand_pct }}%</td>
+          <td class="hrs">{{ row.fair_share }}</td>
+          <td class="hrs">{{ row.alloc_hrs }}</td>
+          <td>
+            <div class="bar-wrap">
+              {% if row.coverage >= 75 %}<div class="bar-fill green" style="width:{{ row.coverage }}%"></div>
+              {% elif row.coverage >= 45 %}<div class="bar-fill orange" style="width:{{ row.coverage }}%"></div>
+              {% else %}<div class="bar-fill red" style="width:{{ row.coverage }}%"></div>{% endif %}
+            </div>
+            &nbsp;<span class="hrs">{{ row.coverage }}%</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="no-data">No student responses yet — metrics will appear after students complete the survey.</div>
+    {% endif %}
+  </div>
+
+  <!-- 2. Skill Alignment -->
+  <div class="section">
+    <div class="section-title">2 · Skill Alignment (Spearman ρ)</div>
+    <div class="explain">
+      <strong>What this measures:</strong> Spearman's rank correlation between
+      (a) how often students voted for each skill and (b) how many student-hours went to topics covering it.
+      ρ = <strong>+1</strong> → schedule perfectly mirrors student priorities.
+      ρ = <strong>0</strong> → no relationship. A p-value ≤ 0.05 confirms statistical significance.
+    </div>
+    {% if alignment_score is not None %}
+    <div class="info-card" style="display:flex;gap:2rem;flex-wrap:wrap;align-items:center;">
+      <div style="text-align:center;">
+        <div class="big-num">{% if alignment_score >= 0 %}+{% endif %}{{ alignment_score }}</div>
+        <div class="mono-sm">ρ × 100</div>
+      </div>
+      <div class="body-sm">
+        {% if alignment_score >= 60 %}
+          ✅ <strong>Strong positive alignment.</strong> The LP successfully directed student hours toward the skills students prioritised.
+        {% elif alignment_score >= 30 %}
+          ⚠️ <strong>Moderate alignment.</strong> The schedule partially reflects demand — curriculum constraints may be limiting further optimisation.
+        {% else %}
+          ❌ <strong>Low alignment.</strong> Hour allocation doesn't closely track skill demand. Review skill mappings or LP floor constraints.
+        {% endif %}
+        <br><span class="mono-sm">p-value = {{ alignment_pval }}{% if alignment_pval <= 0.05 %} (statistically significant){% else %} (not yet significant — more responses may help){% endif %}</span>
+      </div>
+    </div>
+    {% else %}
+    <div class="no-data">Need at least 3 skills with student votes to compute Spearman ρ.</div>
+    {% endif %}
+  </div>
+
+  <!-- 3. Floor Guarantee -->
+  <div class="section">
+    <div class="section-title">3 · Floor Guarantee</div>
+    <div class="explain">
+      <strong>What this measures:</strong> The LP guarantees every topic receives at least <code>30%</code>
+      of its proportional student-hour share, preventing starvation.
+      This list should be empty in a healthy schedule.
+    </div>
+    {% if floor_violations %}
+    <ul class="violation-list">
+      {% for v in floor_violations %}
+      <li class="violation-item">
+        <div>
+          <strong>{{ v.topic }}</strong>
+          <span style="font-size:.75rem;color:var(--sage-md);margin-left:.5rem;">{{ v.module }}</span>
+        </div>
+        <span class="violation-badge">Got {{ v.got }} hrs · Floor {{ v.floor }} hrs</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="ok-msg">✅ All topics meet their minimum hour floor. No topics were starved.</div>
+    {% endif %}
+  </div>
+
+  <!-- 4. LP Efficiency -->
+  <div class="section">
+    <div class="section-title">4 · LP Optimality</div>
+    <div class="explain">
+      <strong>What this measures:</strong> The LP maximises <code>Σ demand_i × student_hours_i</code>.
+      We compare the achieved value against the theoretical upper bound (all hours on the single highest-demand topic).
+      A healthy range is <strong>50–85%</strong>.
+    </div>
+    {% if lp_efficiency is not None %}
+    <div class="info-card" style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;">
+      <div class="big-num">{{ lp_efficiency }}%</div>
+      <div class="body-sm">
+        {% if lp_efficiency >= 70 %}
+          ✅ High efficiency. The solver placed student hours on the most demanded topics while satisfying all curriculum constraints.
+        {% elif lp_efficiency >= 45 %}
+          ⚠️ Moderate efficiency. Curriculum constraints (module caps, floors) are limiting full demand satisfaction — this is expected and healthy.
+        {% else %}
+          ❌ Low efficiency. The optimiser may be overly constrained, or skill demand is very diffuse. Review topic-skill mappings.
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="no-data">Cannot compute — no student demand data available.</div>
+    {% endif %}
+  </div>
+
+  <!-- 5. Gini -->
+  <div class="section">
+    <div class="section-title">5 · Hour Distribution (Gini)</div>
+    <div class="explain">
+      <strong>What this measures:</strong> Gini coefficient of student-hour allocation across topics.
+      A <em>moderate</em> Gini (0.3–0.5) is expected and healthy — it means the LP correctly
+      concentrated hours on high-demand topics. Too low → uniform (demand ignored). Too high → monopolised.
+    </div>
+    {% if gini is not None %}
+    <div class="info-card">
+      <div style="margin-bottom:.75rem;" class="hrs">Gini = {{ gini }}</div>
+      <div class="gini-track">
+        <div class="gini-needle" id="gini-needle" data-gini="{{ gini }}"></div>
+      </div>
+      <div class="gini-labels">
+        <span>0 — equal</span><span>0.5 — moderate</span><span>1 — concentrated</span>
+      </div>
+      <div style="margin-top:.75rem;font-size:.82rem;">
+        {% if gini <= 0.35 %}⚠️ Very even distribution. Demand signals may not be strongly differentiating hours.
+        {% elif gini <= 0.55 %}✅ Healthy moderate concentration — high-demand topics receive proportionally more time.
+        {% else %}⚠️ High concentration. A few topics dominate student hours. Check for extreme skill-demand imbalances.
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="no-data">Not enough active topics to compute Gini.</div>
+    {% endif %}
+  </div>
+
+  <!-- 6. Per-topic Breakdown -->
+  <div class="section">
+    <div class="section-title">6 · Per-topic Hour Breakdown</div>
+    <div class="explain">
+      Full breakdown of every topic: mapped skills, teacher hours, student hours, and total.
+      Topics with <code>0</code> weights are marked as completed.
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="topic-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Module</th><th>Topic</th><th>Skills</th>
+            <th>Teacher Hrs</th><th>Student Hrs</th><th>Total Hrs</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for td in topic_data %}
+          <tr>
+            <td class="hrs" style="color:var(--sage-md);">{{ forloop.counter }}</td>
+            <td style="font-size:.75rem;color:var(--sage-md);">{{ td.module }}</td>
+            <td>{{ td.content }}</td>
+            <td>{% for sk in td.mapped %}<span class="tag">{{ sk }}</span>{% endfor %}</td>
+            <td class="hrs">{{ td.t_hrs }}</td>
+            <td class="hrs">
+              {% if td.s_weight == 0 and td.t_weight == 0 %}<span style="color:var(--sage-md);">—</span>
+              {% else %}{{ td.s_hrs }}{% endif %}
+            </td>
+            <td class="hrs"><strong>{{ td.total_hrs }}</strong></td>
+            <td>
+              {% if td.s_weight == 0 and td.t_weight == 0 %}
+                <span class="tag" style="background:#eee;border-color:#ccc;color:#888;">done</span>
+              {% else %}
+                <span class="tag" style="background:var(--sage-lt);border-color:var(--sage);color:var(--good);">active</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /validate-page -->
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const needle = document.getElementById('gini-needle');
+    if (needle) {
+      const gini = parseFloat(needle.dataset.gini) || 0;
+      needle.style.left = '0%';
+      setTimeout(() => { needle.style.left = (gini * 100) + '%'; }, 200);
+    }
+  });
+</script>
+{% endblock %}
