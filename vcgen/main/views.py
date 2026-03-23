@@ -215,10 +215,11 @@ def compute_lp_student_weights(all_topics, modules_map, skill_demand, course_hou
         uniform_w = 1.0 / n
         return {t.topic_id: uniform_w for t in all_topics}
 
+    total_teacher_w = sum(float(t.teacherweight) for t in all_topics)
+
     floors = []
     for topic in all_topics:
-        mod = modules_map[topic.module_id]
-        teacher_w = float(topic.teacherweight)
+        teacher_w = float(topic.teacherweight) / total_teacher_w if total_teacher_w > 0 else 0.0
         proportional_share = teacher_w * student_pool
         floor = proportional_share * 0.30 if teacher_w > 0 else 0.0
         floors.append(floor)
@@ -1137,6 +1138,22 @@ def update_progress(request, class_id):
         pending_topics = [t for t in all_topic_objs if t.topic_id not in completed_topic_ids]
 
         students = Student.objects.filter(course=ourclass)
+        # skillvotes = {}
+        # totalvotes = 0
+        # for s in students:
+        #     for p in s.skillsreq.split(","):
+        #         p = p.strip()
+        #         if p:
+        #             skillvotes[p] = skillvotes.get(p, 0) + 1
+        #             totalvotes += 1
+        # skill_demand = {a: b / totalvotes for a, b in skillvotes.items()} if totalvotes else {}
+        csv_path = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
+        repo = load_skill_repo_csv(csv_path)
+        tier_map = {}
+        for r in repo:
+            tier = r.get("survey_tier", r["skill"])
+            tier_map.setdefault(tier, []).append(r["skill"])
+
         skillvotes = {}
         totalvotes = 0
         for s in students:
@@ -1145,7 +1162,11 @@ def update_progress(request, class_id):
                 if p:
                     skillvotes[p] = skillvotes.get(p, 0) + 1
                     totalvotes += 1
-        skill_demand = {a: b / totalvotes for a, b in skillvotes.items()} if totalvotes else {}
+
+        skill_demand = {}
+        for survey_label, vote_count in skillvotes.items():
+            for skill in tier_map.get(survey_label, [survey_label]):
+                skill_demand[skill] = skill_demand.get(skill, 0) + (vote_count / max(1, totalvotes))
 
         if pending_topics and skill_demand: 
             lp_weights = compute_lp_student_weights(
@@ -1446,18 +1467,21 @@ def validate_schedule(request, class_id):
     proportionality_score = round(float(np.mean(prop_scores)), 1) if prop_scores else 100.0
     context['proportionality_score'] = proportionality_score
  
+    total_t_weight = sum(td["t_weight"] for td in topic_data)
+
     floor_violations = []
     for td in topic_data:
         if td["s_weight"] == 0 and td["t_weight"] == 0:
-            continue   
-        proportional_share = td["t_weight"] * student_pool
-        floor              = proportional_share * 0.30
-        if td["s_hrs"] < floor - 0.01:   
+            continue
+        global_t_weight = td["t_weight"] / total_t_weight if total_t_weight > 0 else 0.0
+        proportional_share = global_t_weight * student_pool
+        floor = proportional_share * 0.30
+        if td["s_hrs"] < floor - 0.01:
             floor_violations.append({
-                "topic":     td["content"],
-                "module":    td["module"],
-                "got":       round(td["s_hrs"], 2),
-                "floor":     round(floor, 2),
+                "topic":  td["content"],
+                "module": td["module"],
+                "got":    round(td["s_hrs"], 2),
+                "floor":  round(floor, 2),
             })
  
     floor_score = round((1 - len(floor_violations) / max(n, 1)) * 100, 1)
@@ -1465,8 +1489,8 @@ def validate_schedule(request, class_id):
     context['floor_score']      = floor_score
  
     if skill_demand_norm and student_pool > 0 and topic_data:
+        topic_demand_list = []
         actual_obj = 0.0
-        upper_obj  = 0.0
         for td in topic_data:
             topic_demand = 0.0
             conf_total   = 0.0
@@ -1476,8 +1500,9 @@ def validate_schedule(request, class_id):
                 conf_total   += c
             topic_demand = topic_demand / conf_total if conf_total > 0 else 0.0
             actual_obj  += topic_demand * td["s_hrs"]
-            upper_obj   += topic_demand * student_pool   
- 
+            topic_demand_list.append(topic_demand)
+
+        upper_obj = max(topic_demand_list) * student_pool if topic_demand_list else 0.0
         lp_efficiency = round(actual_obj / upper_obj * 100, 1) if upper_obj > 0 else None
     else:
         lp_efficiency = None
