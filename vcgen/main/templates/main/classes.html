@@ -1,39 +1,93 @@
 {% extends "base.html" %}
 
-{% block title %}
-Home
-{% endblock %}
+{% block title %}My Classes{% endblock %}
 
 {% block body %}
-<div class="container mx-auto p-6 bg-gray-100 min-h-screen">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-semibold">Classes</h1>
-        <button onclick="location.href = '/newclass';" class="p-2 rounded-md bg-[#94d1be] text-white flex items-center justify-center text-2xl hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">
-            New Class +
-        </button>
+<main class="min-h-screen bg-[#daf0ee] px-4 py-10 sm:px-6 lg:px-12">
+
+  <div class="max-w-5xl mx-auto">
+
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
+      <div>
+        <p class="text-sm font-medium text-[#6aab97] uppercase tracking-widest mb-1">Dashboard</p>
+        <h1 class="text-4xl font-bold text-[#2e3430] cusfont">My Classes</h1>
+      </div>
+      <button
+        onclick="location.href='/newclass';"
+        class="inline-flex items-center gap-2 bg-[#3b413c] hover:bg-[#2e3430] text-white font-semibold text-sm px-5 py-3 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:cursor-pointer shadow-sm"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        New Class
+      </button>
     </div>
 
-    <div class="flex flex-col gap-4">
-        {% for class in classes %}
-        <div class="flex justify-between items-center p-4 bg-white rounded-lg shadow-md hover:shadow-lg transition">
-            <span class="text-lg font-medium">{{ class.name }} - {{class.course_id}}</span>
-            <div class="flex items-center gap-3">
-                <button 
-                    class="rounded-md p-2 bg-[#94d1be] text-white flex items-center justify-center text-lg hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer"
-                    onclick="location.href='/closeresponses/{{class.course_id}}';">
-                    Close Responses
-                </button>
+    {% if classes %}
+    <div class="flex flex-col gap-3">
+      {% for class in classes %}
+      <div class="group bg-white border border-[#c8e6df] rounded-2xl px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-[#94d1be] hover:shadow-md transition-all duration-200">
 
-                <button 
-                    class="rounded-md p-2 bg-[#94d1be] text-white flex items-center justify-center text-lg hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer"
-                    onclick="location.href = '/results/{{class.course_id}}';">
-                    Results
-                </button>
-            </div>
+        <div class="flex items-center gap-4 min-w-0">
+          <div class="flex-shrink-0 w-11 h-11 rounded-xl bg-[#daf0ee] flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#3b9c7e]" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 3.741-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"/>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <h2 class="text-base font-semibold text-[#2e3430] truncate">{{ class.name }}</h2>
+            <p class="text-xs text-[#7aaa98] font-mono mt-0.5">{{ class.course_id }}</p>
+          </div>
         </div>
-        {% empty %}
-        <p class="text-gray-500 italic">No classes available yet.</p>
-        {% endfor %}
+
+        <div class="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
+
+          <button
+            onclick="location.href='/closeresponses/{{ class.course_id }}';"
+            class="inline-flex items-center gap-1.5 text-xs font-medium text-[#5a7d72] bg-[#eaf6f2] hover:bg-[#d4ede6] border border-[#b8ddd4] px-3 py-2 rounded-lg transition-all duration-150 hover:cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/>
+            </svg>
+            Close Responses
+          </button>
+
+          <button
+            onclick="location.href='/results/{{ class.course_id }}';"
+            class="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-[#94d1be] hover:bg-[#7ec4af] px-4 py-2 rounded-lg transition-all duration-150 hover:cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/>
+            </svg>
+            Results
+          </button>
+
+        </div>
+      </div>
+      {% endfor %}
     </div>
-</div>
+
+    {% else %}
+    <div class="flex flex-col items-center justify-center text-center py-24 bg-white border border-dashed border-[#a8d5c8] rounded-2xl">
+      <div class="w-16 h-16 rounded-2xl bg-[#daf0ee] flex items-center justify-center mb-5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-[#94d1be]" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>
+        </svg>
+      </div>
+      <h2 class="text-xl font-semibold text-[#2e3430] cusfont mb-2">No classes yet</h2>
+      <p class="text-sm text-[#7aaa98] mb-6 max-w-xs">Create your first class to start generating personalised learning schedules.</p>
+      <button
+        onclick="location.href='/newclass';"
+        class="inline-flex items-center gap-2 bg-[#94d1be] hover:bg-[#7ec4af] text-white font-semibold text-sm px-5 py-3 rounded-xl transition-all duration-200 hover:cursor-pointer"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        Create a Class
+      </button>
+    </div>
+    {% endif %}
+
+  </div>
+</main>
 {% endblock %}

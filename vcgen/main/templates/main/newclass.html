@@ -1,163 +1,238 @@
 {% extends "base.html" %}
 
-{% block title %}
-Add New Class!
-{% endblock %}
+{% block title %}New Class — VCGEN{% endblock %}
 
 {% block body %}
-<div class="min-h-screen bg-[#daf0ee] font-sans flex flex-col items-center py-10">
-    <div class="flex flex-row w-full items-center justify-between mb-6">
-        <button onclick="location.href = '/classes';"
-            class="bg-[#94d1be] font-semibold text-white text-lg px-5 py-2 rounded-lg
-                hover:bg-[#9db5b2] transition duration-300 shadow-sm hover:shadow-md mx-2 cursor-pointer">
-            Go Back
-        </button>
-        
-        <h1 class="text-4xl font-bold text-[#3b413c] tracking-wide cusfont">
-            Modules
-        </h1>
+<main class="min-h-screen bg-[#daf0ee] px-4 py-10 sm:px-6 lg:px-12">
+  <div class="max-w-3xl mx-auto">
 
-        <div class="w-[80px]"></div>
+    <div class="flex items-center justify-between gap-4 mb-10">
+      <button
+        onclick="location.href='/classes';"
+        class="inline-flex items-center gap-2 text-sm font-medium text-[#5a7d72] hover:text-[#2e3430] transition-colors hover:cursor-pointer group"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+        </svg>
+        All Classes
+      </button>
+      <div class="text-right">
+        <p class="text-sm font-medium text-[#6aab97] uppercase tracking-widest mb-0.5">Setup</p>
+        <h1 class="text-3xl font-bold text-[#2e3430] cusfont">New Class</h1>
+      </div>
     </div>
-    <form method="post" enctype="multipart/form-data" class="w-full max-w-3xl">
-        {% csrf_token %}
-        <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6 mb-6">
-            <label class="block text-[#3b413c] font-medium mb-2">
-                Upload Syllabus PDF
-            </label>
 
-            <input 
-                type="file" 
-                name="syllabus_pdf"
-                accept=".pdf"
-                class="w-full p-2 border border-[#9db5b2] rounded-md"
-                required
-            />
+    <form method="post" enctype="multipart/form-data" class="mb-6">
+      {% csrf_token %}
+      <div class="bg-white border border-[#c8e6df] rounded-2xl p-6 hover:border-[#94d1be] transition-colors duration-200">
 
-            <button 
-                type="submit"
-                class="mt-3 bg-[#94d1be] text-white px-4 py-2 rounded-md hover:bg-[#9db5b2]"
-            >
-                Upload
-            </button>
+        <div class="flex items-center gap-3 mb-5">
+          <div class="w-8 h-8 rounded-lg bg-[#daf0ee] flex items-center justify-center flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#3b9c7e]" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-semibold text-[#2e3430]">Upload Syllabus PDF</h2>
+            <p class="text-xs text-[#8ab5a8] mt-0.5">Auto-fills module names, hours, and topics from your document</p>
+          </div>
         </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <label class="flex-1 flex items-center gap-3 bg-[#f2fbf8] border border-dashed border-[#94d1be] rounded-xl px-4 py-3 cursor-pointer hover:bg-[#eaf6f2] transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#94d1be] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/>
+            </svg>
+            <span class="text-sm text-[#5a7d72] font-medium" id="file-label">Choose a PDF file…</span>
+            <input
+              type="file"
+              name="syllabus_pdf"
+              accept=".pdf"
+              class="hidden"
+              onchange="document.getElementById('file-label').textContent = this.files[0]?.name || 'Choose a PDF file…'"
+            />
+          </label>
+
+          <button
+            type="submit"
+            class="inline-flex items-center gap-2 bg-[#3b413c] hover:bg-[#2e3430] text-white text-sm font-semibold px-5 py-3 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:cursor-pointer flex-shrink-0"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15M9 12l3 3m0 0 3-3m-3 3V2.25"/>
+            </svg>
+            Parse PDF
+          </button>
+        </div>
+
+      </div>
     </form>
-    <form method="post" class="w-full max-w-3xl flex flex-col gap-6">
-        {% csrf_token %}
 
-        <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-semibold text-[#3b413c] mb-4">
-                Course Details
-            </h2>
+    <form method="post" class="flex flex-col gap-5">
+      {% csrf_token %}
 
-            <label class="block text-[#3b413c] font-medium">Course Name</label>
-            <input 
-                type="text"
-                name="cname"
-                value="{{ course_name|default:'' }}"
-                placeholder="Enter the course name"
-                class="w-full m-1 p-3 border border-[#9db5b2] rounded-md focus:ring-2 focus:ring-[#94d1be]"
-                required
-            />
-
-            <label class="block text-[#3b413c] font-medium mt-3">Course Total Hours</label>
-            <input 
-                type="number"
-                name="chours"
-                placeholder="Enter total course hours"
-                class="w-full m-1 p-3 border border-[#9db5b2] rounded-md focus:ring-2 focus:ring-[#94d1be]"
-                required
-            />
+      <div class="bg-white border border-[#c8e6df] rounded-2xl overflow-hidden hover:border-[#94d1be] transition-colors duration-200">
+        <div class="flex items-center gap-3 px-6 py-4 bg-[#f2fbf8] border-b border-[#d4ede6]">
+          <div class="w-7 h-7 rounded-lg bg-[#94d1be] flex items-center justify-center flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 3.741-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"/>
+            </svg>
+          </div>
+          <h2 class="text-sm font-semibold text-[#2e3430]">Course Details</h2>
         </div>
+
+        <div class="px-6 py-5 grid sm:grid-cols-2 gap-4">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Course Name</label>
+            <input
+              type="text"
+              name="cname"
+              value="{{ course_name|default:'' }}"
+              placeholder="e.g. Database Systems"
+              class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition"
+              required
+            />
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Total Course Hours</label>
+            <input
+              type="number"
+              name="chours"
+              placeholder="e.g. 60"
+              min="1"
+              class="w-full sm:w-40 px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition"
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-4">
 
         {% if parsed_modules %}
-            {% for mod in parsed_modules %}
-            <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6">
+          {% for mod in parsed_modules %}
+          <div class="bg-white border border-[#c8e6df] rounded-2xl overflow-hidden hover:border-[#94d1be] transition-colors duration-200">
 
-                <h2 class="text-xl font-semibold text-[#3b413c] mb-4">
-                    Module - {{ forloop.counter }}
-                </h2>
-
-                <div class="flex gap-3 mb-4">
-                    <input 
-                        type="text"
-                        name="module_name{{ forloop.counter }}"
-                        value="{{ mod.module_name }}"
-                        placeholder="Module name"
-                        class="flex-1 p-2 border border-[#9db5b2] rounded-md focus:ring-2 focus:ring-[#94d1be]"
-                        required
-                    />
-
-                    <input 
-                        type="number"
-                        name="module_hrs{{ forloop.counter }}"
-                        value="{{ mod.hours }}"
-                        min="1"
-                        placeholder="Hours"
-                        class="w-24 p-2 border border-[#9db5b2] rounded-md focus:ring-2 focus:ring-[#94d1be]"
-                        required
-                    />
-                </div>
-
-                <label class="block text-[#3b413c] font-medium mb-1">Topics</label>
-                <input 
-                    type="text"
-                    name="topic{{ forloop.counter }}"
-                    value="{{ mod.topics|join:', ' }}"
-                    placeholder="Enter topics"
-                    class="w-full p-3 border border-[#9db5b2] rounded-md focus:ring-2 focus:ring-[#94d1be]"
-                    required
-                />
+            <div class="flex items-center gap-3 px-6 py-4 bg-[#f2fbf8] border-b border-[#d4ede6]">
+              <span class="w-7 h-7 rounded-lg bg-[#94d1be] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                {{ forloop.counter }}
+              </span>
+              <h3 class="text-sm font-semibold text-[#2e3430]">Module {{ forloop.counter }}</h3>
             </div>
-            {% endfor %}
+
+            <div class="px-6 py-5 flex flex-col gap-4">
+              <div class="flex gap-3">
+                <div class="flex-1">
+                  <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Module Name</label>
+                  <input
+                    type="text"
+                    name="module_name{{ forloop.counter }}"
+                    value="{{ mod.module_name }}"
+                    placeholder="Module name"
+                    class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition"
+                    required
+                  />
+                </div>
+                <div class="w-24 flex-shrink-0">
+                  <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Hours</label>
+                  <input
+                    type="number"
+                    name="module_hrs{{ forloop.counter }}"
+                    value="{{ mod.hours }}"
+                    min="1"
+                    placeholder="Hrs"
+                    class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition text-center"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Topics
+                  <span class="normal-case font-normal text-[#a0c4b8] tracking-normal ml-1">— comma-separated</span>
+                </label>
+                <textarea
+                  name="topic{{ forloop.counter }}"
+                  rows="3"
+                  placeholder="Introduction to SQL, Joins, Indexing, Transactions…"
+                  class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition resize-none"
+                  required
+                >{{ mod.topics|join:', ' }}</textarea>
+              </div>
+            </div>
+
+          </div>
+          {% endfor %}
+
         {% else %}
-            {% for i in "1234567" %}
-            <div class="bg-white border-2 border-[#94d1be] rounded-lg shadow-md p-6">
+          {% for i in "1234567" %}
+          <div class="bg-white border border-[#c8e6df] rounded-2xl overflow-hidden hover:border-[#94d1be] transition-colors duration-200">
 
-                <h2 class="text-xl font-semibold text-[#3b413c] mb-4">
-                    Module - {{ forloop.counter }}
-                </h2>
-
-                <div class="flex gap-3 mb-4">
-                    <input 
-                        type="text"
-                        name="module_name{{ forloop.counter }}"
-                        placeholder="Module name"
-                        class="flex-1 p-2 border border-[#9db5b2] rounded-md focus:ring-2 focus:ring-[#94d1be]"
-                        required
-                    />
-
-                    <input 
-                        type="number"
-                        name="module_hrs{{ forloop.counter }}"
-                        min="1"
-                        placeholder="Hours"
-                        class="w-24 p-2 border border-[#9db5b2] rounded-md focus:ring-2 focus:ring-[#94d1be]"
-                        required
-                    />
-                </div>
-
-                <label class="block text-[#3b413c] font-medium mb-1">Topics</label>
-                <input 
-                    type="text"
-                    name="topic{{ forloop.counter }}"
-                    placeholder="Enter topics"
-                    class="w-full p-3 border border-[#9db5b2] rounded-md focus:ring-2 focus:ring-[#94d1be]"
-                    required
-                />
+            <div class="flex items-center gap-3 px-6 py-4 bg-[#f2fbf8] border-b border-[#d4ede6]">
+              <span class="w-7 h-7 rounded-lg bg-[#94d1be] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                {{ forloop.counter }}
+              </span>
+              <h3 class="text-sm font-semibold text-[#2e3430]">Module {{ forloop.counter }}</h3>
             </div>
-            {% endfor %}
+
+            <div class="px-6 py-5 flex flex-col gap-4">
+              <div class="flex gap-3">
+                <div class="flex-1">
+                  <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Module Name</label>
+                  <input
+                    type="text"
+                    name="module_name{{ forloop.counter }}"
+                    placeholder="Module name"
+                    class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition"
+                    required
+                  />
+                </div>
+                <div class="w-24 flex-shrink-0">
+                  <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Hours</label>
+                  <input
+                    type="number"
+                    name="module_hrs{{ forloop.counter }}"
+                    min="1"
+                    placeholder="Hrs"
+                    class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition text-center"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Topics
+                  <span class="normal-case font-normal text-[#a0c4b8] tracking-normal ml-1">— comma-separated</span>
+                </label>
+                <textarea
+                  name="topic{{ forloop.counter }}"
+                  rows="3"
+                  placeholder="Introduction, Core concepts, Advanced topics…"
+                  class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition resize-none"
+                  required
+                ></textarea>
+              </div>
+            </div>
+
+          </div>
+          {% endfor %}
         {% endif %}
 
-        <div class="flex justify-end mt-6">
-            <button 
-                type="submit"
-                class="bg-[#94d1be] text-white px-6 py-3 rounded-md hover:bg-[#9db5b2]"
-            >
-                Confirm
-            </button>
-        </div>
-    </form>
+      </div>
 
-</div>
+      <div class="flex justify-end pt-2 pb-8">
+        <button
+          type="submit"
+          class="inline-flex items-center gap-2 bg-[#3b413c] hover:bg-[#2e3430] text-white font-semibold text-sm px-7 py-3 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:cursor-pointer shadow-sm"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/>
+          </svg>
+          Generate Schedule
+        </button>
+      </div>
+
+    </form>
+  </div>
+</main>
 {% endblock %}

@@ -1,104 +1,121 @@
 {% extends "base.html" %}
 
-{% block title %}
-Update Schedule
-{% endblock %}
+{% block title %}Update Progress — {{ cname }}{% endblock %}
 
 {% block body %}
-<button onclick="location.href = '/results/{{cid}}';" class="absolute top-20 left-4 w-1/10 bg-[#94d1be] font-bold text-white text-lg p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
-<div class="max-w-4xl mx-auto bg-[#ffffff] shadow-xl rounded-2xl p-8">
-    <h1 class="text-3xl font-bold mb-6 text-[#3b413c]">
-        Update Course Progress
-    </h1>
+<main class="min-h-screen bg-[#daf0ee] px-4 py-10 sm:px-6 lg:px-12">
+  <div class="max-w-3xl mx-auto">
 
-    <form method="POST" class="space-y-8">
-        {% csrf_token %}
+    <div class="flex items-center justify-between gap-4 mb-10">
+      <button
+        onclick="location.href='/results/{{cid}}';"
+        class="inline-flex items-center gap-2 text-sm font-medium text-[#5a7d72] hover:text-[#2e3430] transition-colors hover:cursor-pointer group"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+        </svg>
+        Results
+      </button>
+      <div class="text-right">
+        <p class="text-sm font-medium text-[#6aab97] uppercase tracking-widest mb-0.5">Progress</p>
+        <h1 class="text-3xl font-bold text-[#2e3430] cusfont">Update Schedule</h1>
+      </div>
+    </div>
 
-        <div class="bg-[#daf0ee] p-6 rounded-xl">
-            <h2 class="text-xl font-semibold mb-4 text-[#3b413c]">
-                {{ cname }} - {{ cid }}
-            </h2>
+    <form method="POST" class="flex flex-col gap-5">
+      {% csrf_token %}
 
-            <div class="grid md:grid-cols-2 gap-6">
-
-                <div>
-                    <label class="block text-sm font-medium text-[#3b413c]">
-                        Total Course Hours
-                    </label>
-                    <input
-                        type="number"
-                        name="total_hours"
-                        class="mt-1 w-full rounded-lg border border-[#9db5b2] px-3 py-2 focus:ring-2 focus:ring-[#94d1be] focus:outline-none"
-                        required
-                    >
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-[#3b413c]">
-                        Hours Completed So Far
-                    </label>
-                    <input
-                        type="number"
-                        name="completed_hours"
-                        class="mt-1 w-full rounded-lg border border-[#9db5b2] px-3 py-2 focus:ring-2 focus:ring-[#94d1be] focus:outline-none"
-                        required
-                    >
-                </div>
-
-            </div>
+      <div class="bg-white border border-[#c8e6df] rounded-2xl overflow-hidden hover:border-[#94d1be] transition-colors duration-200">
+        <div class="flex items-center gap-3 px-6 py-4 bg-[#f2fbf8] border-b border-[#d4ede6]">
+          <div class="w-7 h-7 rounded-lg bg-[#94d1be] flex items-center justify-center flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 3.741-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-semibold text-[#2e3430] cusfont">{{ cname }}</h2>
+            <p class="text-xs font-mono text-[#7aaa98]">{{ cid }}</p>
+          </div>
         </div>
 
-        <div class="space-y-6">
+        <div class="px-6 py-5 grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Total Course Hours</label>
+            <input
+              type="number"
+              name="total_hours"
+              min="0"
+              placeholder="e.g. 60"
+              class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-[#5a7d72] uppercase tracking-wide mb-1.5">Hours Completed So Far</label>
+            <input
+              type="number"
+              name="completed_hours"
+              min="0"
+              placeholder="e.g. 20"
+              class="w-full px-3 py-2.5 text-sm border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] focus:border-transparent text-[#2e3430] placeholder-[#b8d4cc] transition"
+              required
+            />
+          </div>
+        </div>
+      </div>
 
-            {% for module in modules %}
-            <div class="border border-[#9db5b2] rounded-xl p-6 bg-[#ffffff]">
+      <p class="text-xs text-[#8ab5a8] px-1">
+        Check every topic already covered in class — hours will be redistributed across the remaining topics.
+      </p>
 
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-[#3b413c]">
-                        {{ module.name }}
-                    </h3>
 
-                </div>
+      {% for module in modules %}
+      <div class="bg-white border border-[#c8e6df] rounded-2xl overflow-hidden hover:border-[#94d1be] transition-colors duration-200">
 
-                <div class="space-y-3">
-
-                    {% for topic in module.topics %}
-                    <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-[#daf0ee] transition cursor-pointer">
-
-                        <input
-                            type="checkbox"
-                            name="completed_topics"
-                            value="{{ topic.topic_id }}"
-                            class="h-5 w-5 rounded border-[#9db5b2] text-[#94d1be] focus:ring-[#94d1be]"
-                        >
-
-                        <div class="flex flex-col">
-                            <span class="text-[#3b413c] font-medium">
-                                {{ topic.content }}
-                            </span>
-
-                        </div>
-
-                    </label>
-                    {% endfor %}
-
-                </div>
-            </div>
-            {% endfor %}
-
+        <div class="flex items-center justify-between px-6 py-4 bg-[#f2fbf8] border-b border-[#d4ede6]">
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 rounded-lg bg-[#94d1be] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+              {{ forloop.counter }}
+            </span>
+            <h3 class="text-sm font-semibold text-[#2e3430] cusfont">{{ module.name }}</h3>
+          </div>
+          <span class="text-xs font-semibold text-[#3b9c7e] bg-[#daf0ee] border border-[#b8ddd4] px-3 py-1 rounded-full">
+            {{ module.hours }} hrs
+          </span>
         </div>
 
-        <div class="pt-4">
-            <button
-                type="submit"
-                class="bg-[#94d1be] hover:bg-[#7fc5ae] text-[#3b413c] px-8 py-3 rounded-xl font-semibold shadow-md transition"
-            >
-                Recalculate Schedule
-            </button>
-        </div>
+        <ul class="divide-y divide-[#edf7f4]">
+          {% for topic in module.topics %}
+          <li>
+            <label class="flex items-center gap-4 px-6 py-3.5 hover:bg-[#f9fdfb] transition-colors duration-150 cursor-pointer">
+              <input
+                type="checkbox"
+                name="completed_topics"
+                value="{{ topic.topic_id }}"
+                class="h-4 w-4 rounded border-[#94d1be] accent-[#94d1be] cursor-pointer flex-shrink-0"
+              />
+              <span class="text-sm text-[#2e3430] leading-snug">{{ topic.content }}</span>
+            </label>
+          </li>
+          {% endfor %}
+        </ul>
+
+      </div>
+      {% endfor %}
+
+      <div class="flex justify-end pt-2 pb-8">
+        <button
+          type="submit"
+          class="inline-flex items-center gap-2 bg-[#3b413c] hover:bg-[#2e3430] text-white font-semibold text-sm px-7 py-3 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:cursor-pointer shadow-sm"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+          </svg>
+          Recalculate Schedule
+        </button>
+      </div>
 
     </form>
-
-</div>
-
+  </div>
+</main>
 {% endblock %}

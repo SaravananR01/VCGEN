@@ -1,53 +1,80 @@
 {% extends "base.html" %}
 
-{% block title %}
-Day-Wise Plan
-{% endblock %}
+{% block title %}Day Plan — {{ cname }}{% endblock %}
+
 {% block body %}
-<div class="flex flex-col  items-center justify-center min-h-screen bg-[#daf0ee]">
-    <div class="w-11/12 bg-white m-2 p-8 rounded-lg shadow-lg border-2 border-[#94d1be] flex flex-col">
-        <div class="flex w-full flex-row justify-between py-4 h-1/6">
-            <div class="w-1/2 flex">
-                <button onclick="location.href = '/results/{{cid}}';" class="w-1/6 bg-[#94d1be] font-bold text-white text-lg p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Back</button>
-            </div>
-            
-            <div class="w-1/2 flex justify-end">
-                <button onclick="location.href = '/download_dayplan/{{cid}}';" class="w-1/6 bg-[#94d1be] text-white p-1 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer m-1">Download Plan</button>
-            </div>
-            
-        </div>
-        
-        <h2 class="text-left text-3xl md:text-4xl font-bold cusfont text-[#2f4f4f] mb-4 tracking-wide">
-            {{ cname }}
-            <span class="text-[#94d1be] font-medium">({{ cid }})</span>
-        </h2>
+<main class="min-h-screen bg-[#daf0ee] px-4 py-10 sm:px-6 lg:px-12">
+  <div class="max-w-5xl mx-auto">
 
-        <h3 class="text-left text-2xl md:text-3xl font-semibold cusfont text-[#3b413c] mb-8 relative">
-            <span class="bg-gradient-to-r from-[#94d1be] to-[#bfe3db] bg-clip-text text-transparent">
-                Day-Wise Split-Up
-            </span>
-            <div class="h-[3px] w-64 mt-2 bg-[#94d1be] rounded-full"></div>
-        </h3>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
+      <button
+        onclick="location.href='/results/{{cid}}';"
+        class="inline-flex items-center gap-2 text-sm font-medium text-[#5a7d72] hover:text-[#2e3430] transition-colors hover:cursor-pointer group"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+        </svg>
+        Results
+      </button>
 
-        {% for slot in slots %}
-        <div class="w-full p-6 md:p-8 rounded-2xl shadow-lg border-2 border-[#94d1be] 
-                    bg-gradient-to-br from-[#bfe3db] to-[#9db5b2] text-[#3b413c] 
-                    m-3 transition-all duration-300 hover:shadow-xl hover:scale-[1.01]">
-
-            <h1 class="text-2xl md:text-3xl font-semibold cusfont flex flex-wrap items-center gap-3 border-b-2 border-[#94d1be] pb-3 mb-4">
-                <span class="text-[#3b413c]">Hour {{ forloop.counter }}:</span>
-                <span class="bg-[#94d1be] text-white text-lg md:text-xl font-medium px-4 py-1 rounded-full shadow-sm">
-                    {{ slot.mod }}
-                </span>
-            </h1>
-
-            <div class="text-lg md:text-xl leading-relaxed bg-white p-4 rounded-xl shadow-sm border border-[#94d1be] hover:bg-[#f3faf9] transition duration-300">
-                {{ slot.content }}
-            </div>
-        </div>
-        {% endfor %}
-
-
+      <button
+        onclick="location.href='/download_dayplan/{{cid}}';"
+        class="inline-flex items-center gap-2 bg-[#3b413c] hover:bg-[#2e3430] text-white font-semibold text-sm px-5 py-3 rounded-xl transition-all duration-200 hover:scale-[1.02] hover:cursor-pointer shadow-sm"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+        </svg>
+        Download PDF
+      </button>
     </div>
-</div>
+
+    <div class="mb-10">
+      <p class="text-sm font-medium text-[#6aab97] uppercase tracking-widest mb-1">Day-Wise Plan</p>
+      <h1 class="text-4xl font-bold text-[#2e3430] cusfont leading-tight">
+        {{ cname }}
+        <span class="text-[#94d1be] font-normal text-3xl ml-1">{{ cid }}</span>
+      </h1>
+      <div class="mt-4 h-px bg-gradient-to-r from-[#94d1be] via-[#b8ddd4] to-transparent"></div>
+    </div>
+
+    <div class="flex items-center gap-2 mb-8">
+      <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#3b9c7e] bg-[#daf0ee] border border-[#b8ddd4] px-3 py-1.5 rounded-full">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+        </svg>
+        {{ slots|length }} contact hours
+      </span>
+    </div>
+
+    <div class="flex flex-col gap-3">
+      {% for slot in slots %}
+      <div class="bg-white border border-[#c8e6df] rounded-2xl overflow-hidden hover:border-[#94d1be] hover:shadow-md transition-all duration-200 group">
+
+        <div class="flex items-center justify-between px-6 py-3.5 bg-[#f2fbf8] border-b border-[#d4ede6]">
+          <div class="flex items-center gap-3">
+            <!-- Hour badge -->
+            <span class="w-8 h-8 rounded-lg bg-[#94d1be] text-white text-xs font-bold flex items-center justify-center flex-shrink-0 tabular-nums">
+              {{ forloop.counter }}
+            </span>
+            <span class="text-xs font-semibold text-[#5a7d72] uppercase tracking-wide">Hour {{ forloop.counter }}</span>
+          </div>
+
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-[#3b9c7e] bg-[#daf0ee] border border-[#b8ddd4] px-3 py-1 rounded-full max-w-xs truncate">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776"/>
+            </svg>
+            {{ slot.mod }}
+          </span>
+        </div>
+
+        <div class="px-6 py-4">
+          <p class="text-sm text-[#2e3430] leading-relaxed">{{ slot.content }}</p>
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+</main>
 {% endblock %}
