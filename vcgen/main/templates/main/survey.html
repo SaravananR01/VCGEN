@@ -3,29 +3,145 @@
 {% block title %}
 Survey
 {% endblock %}
+
 {% block body %}
-<div class="flex flex-col  items-center justify-center min-h-screen bg-[#daf0ee]">
-    <div class="w-11/12 bg-white p-8 m-12 pb-16 rounded-lg shadow-lg border-2 border-[#94d1be]">
 
-        
-        <h2 class="text-left text-2xl font-semibold text-[#3b413c] mb-6">{{cname}} - {{cid}}</h2>
-        <h3 class="text-left text-xl font-semibold text-[#3b413c] mb-6">Choose the skills you are interested in-</h2>
-        <form action="#" method="post">
-            {% csrf_token %}
-            <div class="mb-4 flex flex-col">
-                {% for skill in skills %}
-                <div class="w-full flex flex-row m-4">
-                    <label for="value_{{skill}}" class="block text-[#3b413c] font-medium w-11/12">{{skill}}</label>
-                    <input type="checkbox" id="value_{{skill}}" name="value_{{skill}}" class="w-1/12 p-3 border border-[#9db5b2] rounded-md">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+    .font-cormorant { font-family: 'Cormorant Garamond', serif; }
+    .font-dm        { font-family: 'DM Sans', sans-serif; }
+
+    .skill-row {
+        transition: background 0.18s ease, box-shadow 0.18s ease;
+        cursor: pointer;
+    }
+    .skill-row:hover {
+        background: #f0faf7;
+        box-shadow: inset 3px 0 0 #94d1be;
+    }
+    .skill-row:has(input:checked) {
+        background: #e6f7f3;
+        box-shadow: inset 3px 0 0 #94d1be;
+    }
+
+    .skill-checkbox {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 1.2rem;
+        height: 1.2rem;
+        border: 1.5px solid #9db5b2;
+        border-radius: 5px;
+        background: white;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+        flex-shrink: 0;
+        position: relative;
+    }
+    .skill-checkbox:checked {
+        background: #94d1be;
+        border-color: #94d1be;
+    }
+    .skill-checkbox:checked::after {
+        content: '';
+        position: absolute;
+        left: 3.5px;
+        top: 1px;
+        width: 5px;
+        height: 9px;
+        border: 2px solid white;
+        border-top: none;
+        border-left: none;
+        transform: rotate(45deg);
+    }
+    .skill-checkbox:active { transform: scale(0.9); }
+
+    .btn-submit {
+        position: relative;
+        overflow: hidden;
+        transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
+    }
+    .btn-submit:hover {
+        box-shadow: 0 6px 20px rgba(148, 209, 190, 0.45);
+        transform: translateY(-1px);
+    }
+    .btn-submit:active { transform: translateY(0); }
+    .btn-submit::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+        transform: translateX(-100%);
+        transition: transform 0.5s ease;
+    }
+    .btn-submit:hover::after { transform: translateX(100%); }
+</style>
+
+<div class="font-dm relative min-h-[calc(100vh-130px)] bg-[#daf0ee] px-4 py-10 sm:px-8">
+
+    <div class="pointer-events-none absolute inset-0 z-0" style="background:
+        radial-gradient(circle at 12% 25%, rgba(148,209,190,0.18) 0%, transparent 50%),
+        radial-gradient(circle at 88% 75%, rgba(157,181,178,0.13) 0%, transparent 45%);">
+    </div>
+
+    <div class="relative z-10 mx-auto max-w-2xl">
+
+        <div class="mb-8">
+            <p class="font-cormorant text-4xl font-light tracking-tight text-[#2e3430] sm:text-5xl">
+                Skill Survey
+            </p>
+            <p class="mt-2 text-sm font-light text-[#5a6b63]">
+                {{ cname }}
+                <span class="mx-1.5 text-[#9db5b2]">·</span>
+                <span class="font-mono tracking-wider text-[#94d1be]">{{ cid }}</span>
+            </p>
+        </div>
+
+        <div class="h-1 w-full rounded-t-2xl bg-gradient-to-r from-[#94d1be] via-[#9db5b2] to-[#daf0ee]"></div>
+
+        <div class="rounded-b-2xl bg-white px-6 py-8 shadow-xl shadow-[#9db5b2]/20 sm:px-10 sm:py-10">
+
+            <p class="mb-1 font-cormorant text-2xl font-light text-[#2e3430] sm:text-3xl">
+                What skills are you interested in?
+            </p>
+            <p class="mb-8 text-sm font-light text-[#5a6b63]">
+                Select all that apply. Your preferences help personalise your learning schedule.
+            </p>
+
+            <form action="#" method="post" class="flex flex-col gap-8">
+                {% csrf_token %}
+
+                <div class="flex flex-col overflow-hidden rounded-xl border border-[#94d1be]/30">
+                    {% for skill in skills %}
+                    <label for="value_{{ skill }}"
+                           class="skill-row flex items-center justify-between
+                                  gap-4 px-5 py-4
+                                  {% if not forloop.last %}border-b border-[#daf0ee]{% endif %}">
+                        <span class="text-sm font-medium text-[#2e3430]">{{ skill }}</span>
+                        <input type="checkbox"
+                               id="value_{{ skill }}"
+                               name="value_{{ skill }}"
+                               class="skill-checkbox">
+                    </label>
+                    {% endfor %}
                 </div>
-                <hr>
-                {% endfor %}
-            </div>
 
-            <div class="flex flex-col  items-center justify-center">
-                <button type="submit" class="w-1/2 bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Submit</button>
-            </div>
-        </form>
+                <button type="submit"
+                        class="btn-submit w-full rounded-xl bg-[#94d1be] py-3.5
+                               text-sm font-medium uppercase tracking-widest text-white
+                               hover:bg-[#7fc5ae] cursor-pointer">
+                    Submit Preferences
+                </button>
+
+            </form>
+
+        </div>
+
+        <p class="mt-6 text-center font-cormorant italic text-sm text-[#9db5b2]">
+            Logged in as {{ name }}
+        </p>
+
     </div>
 </div>
+
 {% endblock %}

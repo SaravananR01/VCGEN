@@ -5,23 +5,177 @@ VCGEN
 {% endblock %}
 
 {% block body %}
-<div class="flex h-screen bg-[#daf0ee]">
-    <div class="flex-1 bg-[#94d1be] text-white flex items-center justify-center cursor-pointer hover:bg-[#9db5b2] transition duration-300" onclick="location.href = '/login';">
-        <div class="text-center hover:scale-105 transition-all duration-300 ease-in-out">
-            {%load static%}
-            <img src="{% static 'main/teacher-svg.svg' %}" alt="Faculty Icon" class="w-16 h-16 mb-4 mx-auto">
-            <h2 class="text-4xl font-bold">Faculty</h2>
-            <p class="mt-2 text-xl">Click here to access Faculty Login</p>
-        </div>
+
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+    .font-cormorant { font-family: 'Cormorant Garamond', serif; }
+    .font-dm        { font-family: 'DM Sans', sans-serif; }
+
+    .panel-hover-lift:hover .lift-target { transform: translateY(-6px); }
+    .lift-target { transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+
+    .shimmer { position: relative; }
+    .shimmer::after {
+        content: '';
+        position: absolute;
+        bottom: 0; left: 0;
+        height: 2px; width: 0;
+        background: linear-gradient(90deg, transparent, #94d1be, transparent);
+        transition: width 0.5s ease;
+    }
+    .panel-hover-lift:hover .shimmer::after { width: 100%; }
+
+    .arrow-slide { display: inline-block; transition: transform 0.3s ease; }
+    .panel-hover-lift:hover .arrow-slide { transform: translateX(5px); }
+
+    .ghost-letter {
+        position: absolute;
+        font-family: 'Cormorant Garamond', serif;
+        font-weight: 300;
+        line-height: 1;
+        user-select: none;
+        pointer-events: none;
+        transition: opacity 0.4s ease;
+    }
+    .panel-hover-lift:hover .ghost-letter { opacity: 0.8; }
+</style>
+
+<div class="font-dm relative flex flex-col sm:flex-row overflow-hidden bg-[#daf0ee]"
+     style="min-height: calc(100vh - 130px);">
+
+    <div class="pointer-events-none absolute inset-0 z-0" style="background:
+        radial-gradient(circle at 18% 50%, rgba(148,209,190,0.18) 0%, transparent 48%),
+        radial-gradient(circle at 80% 18%, rgba(157,181,178,0.14) 0%, transparent 44%),
+        radial-gradient(circle at 62% 82%, rgba(148,209,190,0.11) 0%, transparent 40%);">
     </div>
 
-    <div class="flex-1 bg-[#ffffff] text-[#3b413c] flex items-center justify-center cursor-pointer hover:bg-[#f1f5f3] transition duration-300" onclick="location.href = '/joinclass';">
-        <div class="text-center hover:scale-105 transition-all duration-300 ease-in-out">
-            {%load static%}
-            <img src="{% static 'main/student-svg.svg' %}" alt="Student Icon" class="w-16 h-16 mb-4 mx-auto">
-            <h2 class="text-4xl font-bold">Student</h2>
-            <p class="mt-2 text-xl">Click here to Join a Class</p>
-        </div>
+    <div class="pointer-events-none absolute inset-0 z-0" style="
+        background-image:
+            linear-gradient(rgba(59,65,60,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(59,65,60,0.04) 1px, transparent 1px);
+        background-size: 60px 60px;">
     </div>
+
+    <div class="absolute left-1/2 z-10 hidden sm:block -translate-x-px"
+         style="top: 10%; height: 80%; width: 1px;
+                background: linear-gradient(to bottom,
+                    transparent,
+                    rgba(59,65,60,0.14) 28%,
+                    rgba(59,65,60,0.14) 72%,
+                    transparent);">
+    </div>
+
+    <div class="absolute left-[10%] top-1/2 z-10 block sm:hidden -translate-y-px"
+         style="width: 80%; height: 1px;
+                background: linear-gradient(to right,
+                    transparent,
+                    rgba(59,65,60,0.14) 28%,
+                    rgba(59,65,60,0.14) 72%,
+                    transparent);">
+    </div>
+
+    <div class="font-cormorant absolute left-1/2 top-1/2 z-20
+                -translate-x-1/2 -translate-y-1/2
+                flex h-10 w-10 items-center justify-center rounded-full
+                border border-[#94d1be]/50 bg-white
+                italic text-sm text-[#94d1be] shadow-md">
+        or
+    </div>
+
+    <div onclick="location.href='/login';"
+         role="button"
+         aria-label="Faculty Login"
+         class="panel-hover-lift shimmer relative z-10 flex flex-1 cursor-pointer
+                items-center justify-center
+                px-8 py-14 sm:px-12 sm:py-20
+                transition-colors duration-300 hover:bg-white/10">
+
+        <div class="lift-target flex w-full max-w-[300px] flex-col items-start gap-5 sm:gap-7">
+
+            <div class="flex h-14 w-14 items-center justify-center rounded-xl
+                        border border-[#94d1be]/50 bg-[#94d1be]/20
+                        sm:h-[68px] sm:w-[68px] sm:rounded-2xl">
+                {% load static %}
+                <img src="{% static 'main/teacher-svg.svg' %}" alt="Faculty"
+                     class="h-6 w-6 opacity-80 sm:h-8 sm:w-8">
+            </div>
+
+            <h2 class="font-cormorant text-4xl font-light leading-none tracking-tight text-[#2e3430]
+                       sm:text-5xl">
+                Faculty
+            </h2>
+
+            <p class="text-sm font-light leading-relaxed text-[#5a6b63]">
+                Sign in to manage courses, configure learning schedules, and view class analytics.
+            </p>
+
+            <button class="inline-flex items-center gap-2 rounded-full bg-[#94d1be]
+                           px-4 py-2 text-xs font-medium uppercase tracking-widest text-white
+                           shadow-sm transition-shadow duration-300
+                           hover:shadow-lg hover:shadow-[#94d1be]/40
+                           sm:px-5 sm:py-2.5">
+                Access Portal
+                <span class="arrow-slide">→</span>
+            </button>
+
+        </div>
+
+        <span class="ghost-letter text-[10rem] sm:text-[16rem]"
+              style="bottom: -1.5rem; right: -0.75rem; color: rgba(148,209,190,0.06);">F</span>
+    </div>
+
+
+    <div onclick="location.href='/joinclass';"
+         role="button"
+         aria-label="Join Class"
+         class="panel-hover-lift shimmer relative z-10 flex flex-1 cursor-pointer
+                items-center justify-center
+                px-8 py-14 sm:px-12 sm:py-20
+                transition-colors duration-300 hover:bg-white/10">
+
+        <div class="lift-target flex w-full max-w-[300px] flex-col items-start gap-5 sm:gap-7">
+
+            <div class="flex h-14 w-14 items-center justify-center rounded-xl
+                        border border-[#3b413c]/15 bg-[#3b413c]/10
+                        sm:h-[68px] sm:w-[68px] sm:rounded-2xl">
+                {% load static %}
+                <img src="{% static 'main/student-svg.svg' %}" alt="Student"
+                     class="h-6 w-6 opacity-75 sm:h-8 sm:w-8">
+            </div>
+
+            <h2 class="font-cormorant text-4xl font-light leading-none tracking-tight text-[#2e3430]
+                       sm:text-5xl">
+                Student
+            </h2>
+
+            <p class="text-sm font-light leading-relaxed text-[#5a6b63]">
+                Join your class with a course code and share your learning preferences with your instructor.
+            </p>
+
+            <button class="inline-flex items-center gap-2 rounded-full bg-[#3b413c]
+                           px-4 py-2 text-xs font-medium uppercase tracking-widest text-[#daf0ee]
+                           shadow-sm transition-shadow duration-300
+                           hover:shadow-lg hover:shadow-[#3b413c]/30
+                           sm:px-5 sm:py-2.5">
+                Join a Class
+                <span class="arrow-slide">→</span>
+            </button>
+
+        </div>
+
+        <span class="ghost-letter text-[10rem] sm:text-[16rem]"
+              style="bottom: -1.5rem; left: -0.75rem; color: rgba(59,65,60,0.04);">S</span>
+    </div>
+
+    <div class="pointer-events-none absolute bottom-4 left-1/2 z-20
+                -translate-x-1/2 whitespace-nowrap text-center
+                hidden xs:block sm:block">
+        <span class="font-cormorant italic text-xs uppercase tracking-[0.22em] text-[#3b413c]/30">
+            Adaptive · Personalized · Intelligent
+        </span>
+    </div>
+
 </div>
+
 {% endblock %}

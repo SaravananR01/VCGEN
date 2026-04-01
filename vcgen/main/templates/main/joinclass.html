@@ -1,34 +1,170 @@
 {% extends "base.html" %}
 
 {% block title %}
-Join A Class!
+Join A Class
 {% endblock %}
+
 {% block body %}
-<div class="flex flex-col items-center justify-center min-h-screen bg-[#daf0ee]">
-    <div class="w-full sm:w-96 bg-white p-8 rounded-lg shadow-lg border-2 border-[#94d1be]">
-        
-        <h2 class="text-center text-2xl font-semibold text-[#3b413c] mb-6">Join a Class</h2>
-        
-        <form action="#" method="post">
-            {% csrf_token %}
-            <div class="mb-4">
-                <label for="code" class="block text-[#3b413c] font-medium">Code</label>
-                <input type="text" id="code" name="code" class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" placeholder="Enter The Code" required>
-            </div>
-            <div class="mb-4">
-                <label for="name" class="block text-[#3b413c] font-medium">Name</label>
-                <input type="text" id="name" name="name" class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" placeholder="Enter Your Name" required>
-            </div>
-            <div class="mb-6">
-                <label for="regno" class="block text-[#3b413c] font-medium">Registration Number</label>
-                <input type="text" id="regno" name="regno" class="w-full p-3 border border-[#9db5b2] rounded-md focus:outline-none focus:ring-2 focus:ring-[#94d1be]" placeholder="Enter Your Registration Number" required>
-            </div>
-            
-            <div>
-                <button type="submit" class="w-full bg-[#94d1be] text-white p-3 rounded-md hover:bg-[#9db5b2] transition duration-300 hover:cursor-pointer">Join Class</button>
-            </div>
-        </form>
-        <div class="text-red-500 text-center">{{error}}</div>
+
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+    .font-cormorant { font-family: 'Cormorant Garamond', serif; }
+    .font-dm        { font-family: 'DM Sans', sans-serif; }
+
+    .input-field { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+    .input-field:focus {
+        border-color: #94d1be;
+        box-shadow: 0 0 0 3px rgba(148, 209, 190, 0.15);
+        outline: none;
+    }
+
+    .heading-line::after {
+        content: '';
+        display: block;
+        margin-top: 0.4rem;
+        height: 2px;
+        width: 2.5rem;
+        background: linear-gradient(90deg, #94d1be, #9db5b2);
+        border-radius: 999px;
+    }
+
+    .btn-submit {
+        position: relative;
+        overflow: hidden;
+        transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
+    }
+    .btn-submit:hover {
+        box-shadow: 0 6px 20px rgba(148, 209, 190, 0.45);
+        transform: translateY(-1px);
+    }
+    .btn-submit:active { transform: translateY(0); }
+    .btn-submit::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+        transform: translateX(-100%);
+        transition: transform 0.5s ease;
+    }
+    .btn-submit:hover::after { transform: translateX(100%); }
+</style>
+
+<div class="font-dm relative flex min-h-[calc(100vh-130px)] items-center justify-center
+            overflow-hidden bg-[#daf0ee] px-4 py-12">
+
+    <div class="pointer-events-none absolute inset-0 z-0" style="background:
+        radial-gradient(circle at 20% 70%, rgba(148,209,190,0.2) 0%, transparent 50%),
+        radial-gradient(circle at 80% 25%, rgba(157,181,178,0.15) 0%, transparent 45%);">
     </div>
+
+    <div class="pointer-events-none absolute inset-0 z-0" style="
+        background-image:
+            linear-gradient(rgba(59,65,60,0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(59,65,60,0.035) 1px, transparent 1px);
+        background-size: 56px 56px;">
+    </div>
+
+    <span class="font-cormorant pointer-events-none absolute bottom-[-1rem] right-[-1rem]
+                 z-0 select-none text-[18rem] font-light leading-none
+                 text-[#94d1be]/[0.06] hidden sm:block">J</span>
+
+    <div class="relative z-10 w-full max-w-md">
+
+        <div class="h-1 w-full rounded-t-2xl bg-gradient-to-r from-[#94d1be] via-[#9db5b2] to-[#daf0ee]"></div>
+
+        <div class="rounded-b-2xl bg-white px-8 py-10 shadow-xl shadow-[#9db5b2]/20
+                    sm:px-12 sm:py-12">
+
+            <div class="mb-10">
+                <p class="font-cormorant text-4xl font-light tracking-tight text-[#2e3430] heading-line sm:text-5xl">
+                    Join a class
+                </p>
+                <p class="mt-4 text-sm font-light text-[#5a6b63]">
+                    Enter your course code and details to get started.
+                </p>
+            </div>
+
+            <form action="#" method="post" class="flex flex-col gap-5">
+                {% csrf_token %}
+
+                <div class="flex flex-col gap-1.5">
+                    <label for="code" class="text-xs font-medium uppercase tracking-widest text-[#3b413c]/70">
+                        Course Code
+                    </label>
+                    <input type="text" id="code" name="code"
+                           placeholder="e.g. C1234567"
+                           required
+                           class="input-field w-full rounded-xl border border-[#9db5b2]/60
+                                  bg-[#daf0ee]/30 px-4 py-3 text-sm text-[#2e3430]
+                                  placeholder:text-[#9db5b2] font-mono tracking-wider">
+                </div>
+
+                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                    <div class="flex flex-col gap-1.5">
+                        <label for="name" class="text-xs font-medium uppercase tracking-widest text-[#3b413c]/70">
+                            Full Name
+                        </label>
+                        <input type="text" id="name" name="name"
+                               placeholder="Your name"
+                               required
+                               class="input-field w-full rounded-xl border border-[#9db5b2]/60
+                                      bg-[#daf0ee]/30 px-4 py-3 text-sm text-[#2e3430]
+                                      placeholder:text-[#9db5b2]">
+                    </div>
+
+                    <div class="flex flex-col gap-1.5">
+                        <label for="regno" class="text-xs font-medium uppercase tracking-widest text-[#3b413c]/70">
+                            Reg. Number
+                        </label>
+                        <input type="text" id="regno" name="regno"
+                               placeholder="e.g. 22BCE1234"
+                               required
+                               class="input-field w-full rounded-xl border border-[#9db5b2]/60
+                                      bg-[#daf0ee]/30 px-4 py-3 text-sm text-[#2e3430]
+                                      placeholder:text-[#9db5b2]">
+                    </div>
+                </div>
+
+                {% if error %}
+                <div class="flex items-center gap-2 rounded-xl border border-red-200
+                            bg-red-50 px-4 py-3 text-sm text-red-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none"
+                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    {{ error }}
+                </div>
+                {% endif %}
+
+                <button type="submit"
+                        class="btn-submit mt-2 w-full rounded-xl bg-[#94d1be] py-3.5
+                               text-sm font-medium uppercase tracking-widest text-white
+                               hover:bg-[#7fc5ae] cursor-pointer">
+                    Join Class
+                </button>
+
+            </form>
+
+            <!-- <div class="mt-8 flex items-center gap-3">
+                <div class="h-px flex-1 bg-[#9db5b2]/30"></div>
+                <span class="font-cormorant italic text-sm text-[#9db5b2]">are you faculty?</span>
+                <div class="h-px flex-1 bg-[#9db5b2]/30"></div>
+            </div>
+
+            <a href="{% url 'login' %}"
+               class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl
+                      border-2 border-[#94d1be]/50 py-3 text-sm font-medium
+                      text-[#3b413c] transition-all duration-200
+                      hover:border-[#94d1be] hover:bg-[#daf0ee]/60 hover:text-[#2e3430]">
+                Faculty login
+                <span class="text-[#94d1be]">→</span>
+            </a> -->
+
+        </div>
+    </div>
+
 </div>
+
 {% endblock %}
