@@ -22,6 +22,22 @@
       </div>
     </div>
 
+    <!-- AI suggestion notice -->
+    <!-- <div class="flex items-start gap-3 bg-white border border-[#b8ddd4] rounded-2xl px-5 py-4 mb-6 shadow-sm">
+      <div class="w-7 h-7 rounded-lg bg-[#94d1be] flex items-center justify-center flex-shrink-0 mt-0.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-[#2e3430]">Difficulty pre-filled by AI</p>
+        <p class="text-xs text-[#6a9a8c] mt-0.5">
+          Each topic's difficulty (1–5) was estimated by the LLM during syllabus processing and used as the initial weight.
+          Review and adjust any values before saving — harder topics will receive proportionally more teacher contact time within their module.
+        </p>
+      </div>
+    </div> -->
+
     <form method="post" class="flex flex-col gap-5">
       {% csrf_token %}
 
@@ -77,7 +93,6 @@
             <span class="text-sm font-medium text-[#5a7d72] flex-shrink-0">%</span>
           </div>
 
-          <!-- Live label -->
           <p id="split-label" class="mt-3 text-xs text-[#8ab5a8]">
             Teacher gets <strong class="text-[#3b9c7e]">50%</strong> of contact hours &mdash; students self-study the remaining <strong class="text-[#a07c3a]">50%</strong>
           </p>
@@ -102,25 +117,45 @@
         <!-- Column headers -->
         <div class="grid grid-cols-[1fr_auto] gap-4 px-6 pt-4 pb-2 border-b border-[#edf7f4]">
           <span class="text-xs font-semibold text-[#5a7d72] uppercase tracking-wide">Topic</span>
-          <span class="text-xs font-semibold text-[#5a7d72] uppercase tracking-wide w-32 text-center">Difficulty (1–5)</span>
+          <div class="w-32 text-center">
+            <span class="text-xs font-semibold text-[#5a7d72] uppercase tracking-wide">Difficulty (1–5)</span>
+            <div class="flex items-center justify-center gap-1 mt-0.5">
+              <!-- <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-[#94d1be]" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/>
+              </svg> -->
+              <!-- <span class="text-[9px] text-[#94d1be] font-medium">AI suggested</span> -->
+            </div>
+          </div>
         </div>
 
-  
         <ul class="divide-y divide-[#edf7f4]">
           {% for topic in module.topicslist %}
           <li class="grid grid-cols-[1fr_auto] gap-4 items-center px-6 py-3.5 hover:bg-[#f9fdfb] transition-colors duration-150">
             <span class="text-sm text-[#2e3430] leading-snug">{{ topic.content }}</span>
-            <div class="w-32 flex justify-center">
+            <div class="w-32 flex flex-col items-center gap-1">
               <input
                 type="number"
                 id="weight_{{ topic.topic_id }}"
                 name="weight_{{ topic.topic_id }}"
                 min="1"
                 max="5"
-                value="1"
+                value="{{ topic.display_difficulty }}"
                 required
                 class="w-20 px-3 py-2 text-sm text-center border border-[#c8e6df] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#94d1be] font-semibold text-[#2e3430] transition"
+                oninput="updateDiffLabel(this)"
               />
+              <!-- Difficulty colour pip -->
+              <span
+                id="diff-label-{{ topic.topic_id }}"
+                class="text-[9px] font-semibold px-2 py-0.5 rounded-full"
+                style="{% if topic.display_difficulty == 1 %}background:#daf0ee;color:#3b9c7e{% elif topic.display_difficulty == 2 %}background:#e8f5d0;color:#5a8a2e{% elif topic.display_difficulty == 3 %}background:#fef3c7;color:#92620a{% elif topic.display_difficulty == 4 %}background:#fee2e2;color:#991b1b{% else %}background:#f3e8ff;color:#6b21a8{% endif %}"
+              >
+                {% if topic.display_difficulty == 1 %}Introductory
+                {% elif topic.display_difficulty == 2 %}Foundational
+                {% elif topic.display_difficulty == 3 %}Intermediate
+                {% elif topic.display_difficulty == 4 %}Advanced
+                {% else %}Expert{% endif %}
+              </span>
             </div>
           </li>
           {% endfor %}
@@ -128,7 +163,6 @@
 
       </div>
       {% endfor %}
-
 
       <div class="flex justify-end pt-2 pb-8">
         <button
@@ -162,5 +196,26 @@
     let val = parseInt(sv.value);
     if (val >= 25 && val <= 75) { ss.value = val; updateSplitLabel(val); }
   });
+
+  // Update the difficulty label pip when teacher changes the value
+  const DIFF_LABELS = {
+    1: { text: 'Introductory', bg: '#daf0ee', color: '#3b9c7e' },
+    2: { text: 'Foundational', bg: '#e8f5d0', color: '#5a8a2e' },
+    3: { text: 'Intermediate', bg: '#fef3c7', color: '#92620a' },
+    4: { text: 'Advanced',     bg: '#fee2e2', color: '#991b1b' },
+    5: { text: 'Expert',       bg: '#f3e8ff', color: '#6b21a8' },
+  };
+
+  function updateDiffLabel(input) {
+    // Derive topic_id from the input's id attribute ("weight_<topic_id>")
+    const topicId = input.id.replace('weight_', '');
+    const label   = document.getElementById('diff-label-' + topicId);
+    if (!label) return;
+    const val = Math.max(1, Math.min(5, parseInt(input.value) || 1));
+    const cfg = DIFF_LABELS[val] || DIFF_LABELS[1];
+    label.textContent        = cfg.text;
+    label.style.background   = cfg.bg;
+    label.style.color        = cfg.color;
+  }
 </script>
 {% endblock %}

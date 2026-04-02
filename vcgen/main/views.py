@@ -79,33 +79,34 @@ def map_all_topics_with_groq(
 
     for batch_num, batch in enumerate(batches):
         syllabus_block = "\n".join(
-            f"  - {topic}" for topic in batch
+            f"  - {topic}" for _, topic in batch
         )
 
-        prompt = f"""Map each course topic to 1-3 academic skills from the list below.
+        prompt = f"""Map each course topic to 1-3 academic skills from the list below, and assign a difficulty level.
 
 COURSE: {subject_context}
 
 SKILLS (use exact names only):
 {skill_block}
 
-TOPICS ([Module] Topic):
+TOPICS:
 {syllabus_block}
 
 Return JSON only:
-{{"mappings": [{{"topic": "<exact topic name>", "skills": ["Skill 1"], "confidence": {{"Skill 1": 0.9}}}}]}}
+{{"mappings": [{{"topic": "<exact topic name>", "skills": ["Skill 1"], "confidence": {{"Skill 1": 0.9}}, "difficulty": 3}}]}}
 
 Rules:
 - Use only skill names from the list above, copied exactly.
 - 1 to 3 skills per topic.
-- Every topic must appear once."""
+- Every topic must appear once.
+- difficulty is an integer 1-5 (1=introductory/definitional, 2=foundational with some prerequisite knowledge, 3=intermediate requiring multi-concept understanding, 4=advanced with significant abstraction or analysis, 5=expert-level synthesis or novel application).
+- Assign difficulty relative to the typical undergraduate student in this subject."""
 
         raw = ""
         for attempt in range(3):
             try:
                 response = client.chat.completions.create(
                     model="llama-3.1-8b-instant",
-                    #model="llama-3.3-70b-versatile",
                     messages=[
                         {
                             "role": "system",
@@ -153,22 +154,27 @@ Rules:
                 skills = [s for s in entry.get("skills", []) if s in valid_skills]
                 conf   = {k: v for k, v in entry.get("confidence", {}).items()
                           if k in valid_skills}
+                raw_diff = entry.get("difficulty", 2)
+                try:
+                    difficulty = max(1, min(5, int(raw_diff)))
+                except (TypeError, ValueError):
+                    difficulty = 2
 
                 if not skills:
                     print(f"[MAPPING FAIL] '{topic}' returned unknown skills: {entry.get('skills')}. Flagged for review.")
-                    result[topic] = {"skill": ["UNMAPPED"], "confidence": {}}
+                    result[topic] = {"skill": ["UNMAPPED"], "confidence": {}, "difficulty": 2}
                     continue
 
-                result[topic] = {"skill": skills, "confidence": conf}
+                result[topic] = {"skill": skills, "confidence": conf, "difficulty": difficulty}
 
         except (json.JSONDecodeError, Exception) as e:
             print(f"[Groq JSON ERROR] batch={batch_num+1}: {e}")
             print(f"[Groq] raw was: {raw[:300]}")
-            for mod, topic in batch:
+            for _, topic in batch:
                 topic_lower = topic.lower()
                 matched = [s for s in valid_skills if s.lower() in topic_lower]
                 best = matched[0] if matched else valid_skills[0]
-                result[topic] = {"skill": [best], "confidence": {best: 0.5}}
+                result[topic] = {"skill": [best], "confidence": {best: 0.5}, "difficulty": 2}
 
         if batch_num < len(batches) - 1:
             time.sleep(30)
@@ -534,30 +540,24 @@ def results(request,class_id):
                 self.teachertime=teachertime
                 self.studenttime=studenttime
                 self.time=teachertime+studenttime
-                #self.cuslabel=ensemble_label(self.topic.content)['pred']
-
 
 
         ourmods=[]
         for mod in modules:
             newmod=cusModule(mod)
 
-            #data[mod.module_id]=[]
             for topic in Topics.objects.filter(module=mod):
                 teachertime=round(topic.teacherweight*mod.hours*ourclass.split,2)
                 studenttime=round(topic.studentweight*ourclass.hours*(100-(ourclass.split*100))/100,2)
                 newtopic=cusTopic(topic,teachertime,studenttime)
                 newmod.addtopic(newtopic)
 
-                
-                #data[mod.module_id].append(f"{topic.content} - {teachertime} + {studenttime} = {teachertime+studenttime} hours")
             ourmods.append(newmod)
 
 
         context['cid']=class_id
         context['cname']=ourclass.name
-        context['modules']= ourmods#modules
-        #context['topics']=data
+        context['modules']= ourmods
     return render(request,"main/results.html",context=context)
 
 def dayplan(request,class_id):
@@ -591,7 +591,6 @@ def dayplan(request,class_id):
                 self.teachertime=teachertime
                 self.studenttime=studenttime
                 self.time=teachertime+studenttime
-                #self.cuslabel=ensemble_label(self.topic.content)['pred']
 
         ourmods=[]
         for mod in modules:
@@ -622,12 +621,10 @@ def dayplan(request,class_id):
                     tempmod+=mod.mod.name+", "
                     lastmod=mod.mod.name
                 cur+=topic.time
-                #print(tempcontent,tempmod)
                 while cur>1:
                     tempcontent=tempcontent.rstrip(", ")
                     tempmod=tempmod.rstrip(", ")
                     newslot=slot(tempcontent,tempmod)
-                    #print(tempcontent,tempmod)
                     slots.append(newslot)
                     if cur==1:
                         cur=0
@@ -640,7 +637,6 @@ def dayplan(request,class_id):
         tempcontent=tempcontent.rstrip(", ")
         tempmod=tempmod.rstrip(", ")
         newslot=slot(tempcontent,tempmod)
-        #print(tempcontent,tempmod)
         slots.append(newslot)
         context['cid']=class_id
         context['cname']=ourclass.name
@@ -762,63 +758,7 @@ def newclass(request):
             print(i)
         print("Length of PDF: ",len(parsed_modules))
         return render(request,"main/newclass.html",context)
-    # if request.method=='POST':
-    #     faculty=Teacher.objects.filter(teacher_id=request.session['user'])[0]
-    #     newcourse=Course.objects.create(
-    #         course_id=gen_course_id(),
-    #         teacher=faculty,
-    #         name=request.POST['cname'],
-    #         hours=0,
-    #         split=0,
-    #     )
-    #     hours=0
-    #     for i in range(1,8):
-    #         modname=request.POST[f'module_name{i}']
-    #         modhours=request.POST[f'module_hrs{i}']
-    #         modtopics=request.POST[f'topic{i}']
-    #         hours+=int(modhours)
-    #         newmod=Module.objects.create(
-    #             module_id=gen_module_id(),
-    #             course=newcourse,
-    #             hours=modhours,
-    #             name=modname
-    #         )
-    #         text=modtopics.replace("\n"," ")
-    #         text=text.replace(", and",", ")
-    #         text=text.replace(" - ","$$$")
-    #         text=text.replace(" – ","$$$")
-    #         text=text.replace("- ","$$$")
-    #         text=text.replace(" -","$$$")
-    #         brackettrue=False
-    #         op=""
-    #         for x in text:
-    #             if x=="," and not brackettrue:
-    #                 op+="$$$"
-    #             else:
-    #                 op+=x
-                
-    #             if x=="(":
-    #                 brackettrue=True
-    #             elif x==")":
-    #                 brackettrue=False
-    #         text=op
-    #         topicslist=text.split("$$$")
-    #         op=[]
-    #         for topic in topicslist:
-    #             topic=topic.strip(" ")
-    #             if topic[0].isupper()  or not op:
-    #                 op.append(topic)
-    #             else:
-    #                 temp=op.pop()
-    #                 op.append(temp+", "+topic)
-    #         topicslist=op
-    #         '''
-    #         text=modtopics.replace("\n"," ")
-    #         text=text.replace(", and",", ")
-    #         pattern=r' - | – |,'
-    #         topicslist =re.split(pattern, text)'''
-    #         subject=request.POST['cname']
-    #         print(subject)
+
     if request.method == 'POST':
         faculty   = Teacher.objects.filter(teacher_id=request.session['user'])[0]
         newcourse = Course.objects.create(
@@ -881,104 +821,31 @@ def newclass(request):
         csv_path   = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
         topic_map = map_all_topics_with_groq(modules_data, subject, csv_path)
         print(topic_map)
+
         for mod_data in modules_data:
             for topic in mod_data["topics"]:
-                mapping    = topic_map.get(topic, {"skill": ["Foundations & Theory"], "confidence": {}})
+                mapping    = topic_map.get(topic, {"skill": ["Foundations & Theory"], "confidence": {}, "difficulty": 2})
                 skills     = mapping["skill"]
                 skill_conf = mapping["confidence"]
+                difficulty = mapping.get("difficulty", 2)
+                skill_conf_with_diff = dict(skill_conf)
+                skill_conf_with_diff["__difficulty__"] = difficulty
 
                 newtopic = Topics.objects.create(
                     topic_id=gen_topic_id(),
                     module=mod_data["mod_obj"],
                     content=topic,
                     mapped_skill=skills,
-                    teacherweight=0,
+                    teacherweight=difficulty,
                     studentweight=0,
                 )
-                newtopic.skill_confidence = skill_conf
+                newtopic.skill_confidence = skill_conf_with_diff
                 newtopic.save()
 
         newcourse.hours = hours
         newcourse.save()
         return redirect(f'/settings/{newcourse.course_id}')
-        #     fnresult=map_topics_HF_blend(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
-        #     fnresult=map_topics_via_bloom(topicslist,subject,os.path.join(os.path.dirname(__file__), 'skill_repo.csv'))['skill'].to_list()
-        #     for i,topic in enumerate(topicslist):
-        #         #mappedval=ensemble_label(topic)['pred']
-        #         newtopic=Topics.objects.create(
-        #             topic_id=gen_topic_id(),
-        #             module=newmod,
-        #             content=topic,
-        #             mapped_skill=fnresult[i],
-        #             teacherweight=0,
-        #             studentweight=0,
-        #         )
-            
-        #     ALt
-        #     bloom_df = map_topics_via_bloom(
-        #         topicslist, subject,
-        #         os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
-        #     )
-        #     for i, topic in enumerate(topicslist):
-        #         row = bloom_df.iloc[i]
-        #         skills = row['skill']         
-        #         confidences = row['confidence']
 
-        #         skill_conf = {}
-        #         bloom_to_skill_map = BLOOM_TO_SKILL
-        #         for bloom_label, score in confidences.items():
-        #             for skill in bloom_to_skill_map.get(bloom_label, []):
-        #                 if skill in skills:
-        #                     skill_conf[skill] = max(skill_conf.get(skill, 0.0), score)
-
-        #         newtopic = Topics.objects.create(
-        #             topic_id=gen_topic_id(),
-        #             module=newmod,
-        #             content=topic,
-        #             mapped_skill=skills,       
-        #             teacherweight=0,
-        #             studentweight=0,
-        #         )
-        #         try:
-        #             newtopic.skill_confidence = skill_conf
-        #             newtopic.save()
-        #         except Exception:
-        #             pass 
-
-        #     #primary
-        #     hf_df = map_topics_HF_blend_2(
-        #         topicslist, subject,
-        #         os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
-        #     )
-        #     for i, topic in enumerate(topicslist):
-        #         row = hf_df.iloc[i]
-
-        #         skills = row['skill']
-        #         if isinstance(skills, str):
-        #             skills = [skills]
-        #         elif not isinstance(skills, list):
-        #             skills = list(skills)
-
-        #         confidences = row['confidence'] 
-        #         skill_conf = {skill: float(confidences.get(skill, 0.0)) for skill in skills}
-
-        #         newtopic = Topics.objects.create(
-        #             topic_id=gen_topic_id(),
-        #             module=newmod,
-        #             content=topic,
-        #             mapped_skill=skills,
-        #             teacherweight=0,
-        #             studentweight=0,
-        #         )
-        #         try:
-        #             newtopic.skill_confidence = skill_conf
-        #             newtopic.save()
-        #         except Exception:
-        #             pass
-        # newcourse.hours=hours
-        # newcourse.save()
-        
-        # return redirect(f'/settings/{newcourse.course_id}')
     return render(request,"main/newclass.html")
 
 def settings(request,class_id):
@@ -996,7 +863,6 @@ def settings(request,class_id):
                 self.mod=mod
                 self.topicslist=[]
                 
-            
             def addtopic(self,topic):
                 self.topicslist.append(topic)
 
@@ -1006,12 +872,26 @@ def settings(request,class_id):
         for mod in modules:
             curmod=cusModule(mod)
             for topic in Topics.objects.filter(module=mod):
+                conf = topic.skill_confidence or {}
+                stored_diff = conf.get("__difficulty__")
+                if stored_diff is not None:
+                    try:
+                        topic.display_difficulty = max(1, min(5, int(stored_diff)))
+                    except (TypeError, ValueError):
+                        topic.display_difficulty = 1
+                else:
+                    tw = float(topic.teacherweight)
+                    if 1.0 <= tw <= 5.0:
+                        topic.display_difficulty = max(1, min(5, round(tw)))
+                    else:
+                        topic.display_difficulty = 1
                 curmod.addtopic(topic)
             datamodules.append(curmod)
 
         context['cid']=class_id
         context['cname']=ourclass.name
         context['modules']= datamodules
+
         if request.method=="POST":
             coursesplit=int(request.POST[f'sv_hoursplit'])
             ourclass.split=coursesplit/100
@@ -1021,7 +901,11 @@ def settings(request,class_id):
                 for topic in mod.topicslist:
                     weightsum+=int(request.POST[f'weight_{topic.topic_id}'])
                 for topic in mod.topicslist:
-                    topic.teacherweight=int(request.POST[f'weight_{topic.topic_id}'])/weightsum
+                    submitted_weight = int(request.POST[f'weight_{topic.topic_id}'])
+                    topic.teacherweight = submitted_weight / weightsum
+                    conf = topic.skill_confidence or {}
+                    conf["__difficulty__"] = submitted_weight
+                    topic.skill_confidence = conf
                     topic.save()
             return redirect(f'/results/{class_id}')
             
@@ -1138,15 +1022,6 @@ def update_progress(request, class_id):
         pending_topics = [t for t in all_topic_objs if t.topic_id not in completed_topic_ids]
 
         students = Student.objects.filter(course=ourclass)
-        # skillvotes = {}
-        # totalvotes = 0
-        # for s in students:
-        #     for p in s.skillsreq.split(","):
-        #         p = p.strip()
-        #         if p:
-        #             skillvotes[p] = skillvotes.get(p, 0) + 1
-        #             totalvotes += 1
-        # skill_demand = {a: b / totalvotes for a, b in skillvotes.items()} if totalvotes else {}
         csv_path = os.path.join(os.path.dirname(__file__), 'skill_repo.csv')
         repo = load_skill_repo_csv(csv_path)
         tier_map = {}
@@ -1244,7 +1119,6 @@ def analytics(request, class_id):
     context['skill_labels'] = hm_skill_order  
 
     def _conf_color(val):
-        """Return hex bg and text color for a 0-1 confidence value."""
         if val <= 0:
             return "#f0f8f6", "#c0d4d0"         
         r = int(0xda + (0x3d - 0xda) * val)
@@ -1324,19 +1198,6 @@ def analytics(request, class_id):
     return render(request, "main/analytics.html", context=context)
 
 def validate_schedule(request, class_id):
-    """
-    Validation dashboard for VCGEN schedule quality.
- 
-    Metrics computed:
-    1. Demand Coverage Score     — how well student votes are reflected in hours
-    2. Skill Alignment Score     — weighted Spearman ρ between vote-rank & hour-rank
-    3. Proportionality Score     — are hours proportional to topic weights (teacher)?
-    4. Floor Guarantee Check     — no topic starved of its minimum share
-    5. LP Optimality Proxy       — objective value vs. upper bound (full demand)
-    6. Skill Distribution Gini   — concentration of student hours across skills
-    """
-
- 
     context = {}
     if 'user' not in request.session:
         return redirect('login')
